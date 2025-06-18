@@ -1,4 +1,31 @@
 # 🚀 PHM Predictive Maintenance Training Environment Analysis & Resource Assessment
+# 🚀 PHM Predictive Maintenance Training Environment Analysis & Resource Assessment
+
+"""
+PHM Training Analyzer - A comprehensive tool for analyzing and optimizing predictive maintenance model training configurations.
+
+This analyzer provides intelligent estimation and optimization recommendations for training deep learning models 
+in predictive maintenance scenarios. It evaluates hardware resources, estimates training times and memory usage, 
+and provides task-specific recommendations for optimal performance.
+
+Key Calculation Logic:
+- **Training Time Estimation**: Uses baseline times for different model architectures (CNN-LSTM, Transformer, ResNet, VAE-LSTM)
+  and adjusts based on dataset size, batch size, and model complexity using scaling factors
+- **Memory Usage Calculation**: Estimates GPU/RAM requirements by calculating model parameters memory (4MB per million params),
+  gradient memory (equal to model size), data memory (batch_size × input_size × 4 bytes), and optimizer memory (2x model size for Adam)
+- **Hardware Detection**: Automatically detects CPU cores, RAM, GPU availability and memory to provide feasible configurations
+- **Optimization Recommendations**: Provides task-specific batch size and epoch suggestions based on model architecture characteristics
+  and dataset size patterns observed in predictive maintenance applications
+
+Core Functions:
+- Hardware resource detection and analysis
+- Training time and memory estimation with safety margins
+- Batch size and epoch optimization for different PHM tasks (bearing fault diagnosis, RUL prediction, health assessment, anomaly detection)
+- Data dimension analysis with preprocessing overhead calculations
+- Resource optimization strategies for CPU and GPU environments
+- Interactive GUI for real-time configuration analysis and recommendations
+"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
