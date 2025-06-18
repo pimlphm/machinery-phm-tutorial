@@ -428,7 +428,7 @@ class PHMTrainingAnalyzer:
         return recommendations
 
 # Create GUI Interface
-def create_phm_gui():
+def create_phm_resource_assessment():
     analyzer = PHMTrainingAnalyzer()
     
     # Display hardware info
