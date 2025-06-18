@@ -25,6 +25,7 @@ Core Functions:
 - Interactive GUI for real-time configuration analysis and recommendations
 """
 # 🚀 PHM Predictive Maintenance Training Environment Analysis & Resource Assessment
+# 🚀 PHM Predictive Maintenance Training Environment Analysis & Resource Assessment
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -89,10 +90,13 @@ class PHMTrainingAnalyzer:
     
     def _detect_hardware(self):
         """Detect available hardware resources"""
-        if torch.cuda.is_available():
-            self.gpu_available = True
-            self.gpu_name = torch.cuda.get_device_name(0)
-            self.gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        try:
+            if torch.cuda.is_available():
+                self.gpu_available = True
+                self.gpu_name = torch.cuda.get_device_name(0)
+                self.gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        except:
+            self.gpu_available = False
     
     def estimate_training_time(self, task_type, epochs, batch_size, dataset_size, model_params_m):
         """Estimate training time based on task configuration"""
@@ -111,8 +115,8 @@ class PHMTrainingAnalyzer:
         total_time = time_per_epoch * epochs
         
         return {
-            "time_per_epoch": f"{time_per_epoch:.1f} minutes",
-            "total_time": f"{total_time:.1f} minutes ({total_time/60:.1f} hours)",
+            "time_per_epoch": time_per_epoch,
+            "total_time": total_time,
             "device_type": "GPU" if self.gpu_available else "CPU"
         }
     
@@ -121,22 +125,27 @@ class PHMTrainingAnalyzer:
         
         # Parse input dimensions (e.g., "(2048, 1)" -> 2048)
         try:
-            input_size = eval(input_dims.replace("(", "").replace(")", "").split(",")[0])
+            # Remove parentheses and spaces, split by comma, take first element
+            input_str = input_dims.strip().replace("(", "").replace(")", "").replace(" ", "")
+            input_size = int(input_str.split(",")[0])
         except:
             input_size = 1024  # Default fallback
         
         # Parse output dimensions (e.g., "4 classes" -> 4)
         try:
-            if "classes" in output_dims.lower():
-                output_size = int(output_dims.split()[0])
-            elif "continuous" in output_dims.lower():
+            output_str = output_dims.strip().lower()
+            if "classes" in output_str or "class" in output_str:
+                output_size = int(output_str.split()[0])
+            elif "continuous" in output_str:
+                output_size = 1
+            elif "binary" in output_str:
                 output_size = 1
             else:
-                output_size = int(output_dims)
+                output_size = int(output_str)
         except:
             output_size = 1  # Default fallback
         
-        # Memory estimation
+        # Memory estimation (in GB)
         model_memory = model_params_m * 0.004  # ~4MB per M parameters
         gradient_memory = model_memory  # Gradients ≈ model size
         
@@ -149,11 +158,11 @@ class PHMTrainingAnalyzer:
         total_memory = model_memory + gradient_memory + data_memory + optimizer_memory
         
         return {
-            "model_memory": f"{model_memory:.2f} GB",
-            "data_memory": f"{data_memory:.3f} GB",
-            "gradient_memory": f"{gradient_memory:.2f} GB",
-            "optimizer_memory": f"{optimizer_memory:.2f} GB",
-            "total_memory": f"{total_memory:.2f} GB",
+            "model_memory": model_memory,
+            "data_memory": data_memory,
+            "gradient_memory": gradient_memory,
+            "optimizer_memory": optimizer_memory,
+            "total_memory": total_memory,
             "feasible": total_memory <= self.ram_gb * 0.8  # Use 80% of available RAM
         }
     
@@ -171,11 +180,11 @@ class PHMTrainingAnalyzer:
     
     def get_optimal_batch_size_suggestions(self, task_type, dataset_size, model_params_m, input_dims):
         """Provide optimal batch size suggestions based on hardware and task"""
-        suggestions = []
         
         # Parse input dimensions for memory calculation
         try:
-            input_size = eval(input_dims.replace("(", "").replace(")", "").split(",")[0])
+            input_str = input_dims.strip().replace("(", "").replace(")", "").replace(" ", "")
+            input_size = int(input_str.split(",")[0])
         except:
             input_size = 1024
         
@@ -188,7 +197,7 @@ class PHMTrainingAnalyzer:
         
         # Calculate theoretical maximum batch size
         remaining_memory = available_memory - model_memory * 3  # Model + gradients + optimizer
-        max_batch_size = int(remaining_memory / per_sample_memory)
+        max_batch_size = max(1, int(remaining_memory / per_sample_memory)) if per_sample_memory > 0 else 1024
         
         # Task-specific recommendations
         if task_type == "Bearing Fault Diagnosis":
@@ -207,9 +216,15 @@ class PHMTrainingAnalyzer:
             suggested_sizes = [32, 64, 128, 256]
             optimal_range = "64-128"
             reason = "VAE-LSTM benefits from larger batches for stable reconstruction loss"
+        else:
+            suggested_sizes = [16, 32, 64, 128]
+            optimal_range = "32-64"
+            reason = "General recommendation for deep learning models"
         
         # Filter suggestions based on memory constraints
         feasible_sizes = [size for size in suggested_sizes if size <= max_batch_size]
+        if not feasible_sizes:
+            feasible_sizes = [min(suggested_sizes)]
         
         return {
             "suggested_sizes": feasible_sizes,
@@ -223,7 +238,7 @@ class PHMTrainingAnalyzer:
         """Provide optimal epoch suggestions based on task and data characteristics"""
         
         # Calculate steps per epoch
-        steps_per_epoch = dataset_size // batch_size
+        steps_per_epoch = max(1, dataset_size // batch_size)
         
         if task_type == "Bearing Fault Diagnosis":
             if dataset_size < 5000:
@@ -269,15 +284,32 @@ class PHMTrainingAnalyzer:
                 epochs_range = "50-100"
                 reason = "Large dataset enables efficient anomaly detection training"
         
+        else:
+            epochs_range = "100-200"
+            reason = "General recommendation for deep learning training"
+        
+        # Extract minimum epochs for patience calculation
+        try:
+            min_epochs = int(epochs_range.split("-")[0])
+            max_epochs = int(epochs_range.split("-")[1])
+            patience = max(10, max_epochs // 10)
+        except:
+            min_epochs = 100
+            patience = 15
+        
         return {
             "epochs_range": epochs_range,
             "steps_per_epoch": steps_per_epoch,
             "reason": reason,
-            "early_stopping_patience": max(10, int(epochs_range.split("-")[1]) // 10)
+            "early_stopping_patience": patience
         }
     
     def get_data_dimension_analysis(self, task_type, input_dims, output_dims, dataset_size):
         """Analyze data dimensions and provide optimization suggestions"""
+        
+        if task_type not in self.base_configs:
+            return {"suggestions": ["Unknown task type"], "typical_input": "N/A", "typical_output": "N/A", 
+                   "preprocessing_memory_gb": "0.00", "dimension_ratio": 1.0}
         
         config = self.base_configs[task_type]
         typical_input = config["typical_input"]
@@ -286,13 +318,15 @@ class PHMTrainingAnalyzer:
         
         # Parse current dimensions
         try:
-            current_input_size = eval(input_dims.replace("(", "").replace(")", "").split(",")[0])
+            input_str = input_dims.strip().replace("(", "").replace(")", "").replace(" ", "")
+            current_input_size = int(input_str.split(",")[0])
         except:
             current_input_size = 1024
         
         # Parse typical dimensions for comparison
         try:
-            typical_input_size = eval(typical_input.replace("(", "").replace(")", "").split(",")[0])
+            typical_str = typical_input.replace("(", "").replace(")", "").replace(" ", "")
+            typical_input_size = int(typical_str.split(",")[0])
         except:
             typical_input_size = 1024
         
@@ -305,6 +339,8 @@ class PHMTrainingAnalyzer:
         elif current_input_size < typical_input_size * 0.5:
             suggestions.append(f"📈 Input dimension might be too small: {current_input_size} vs typical {typical_input_size}")
             suggestions.append("💡 Consider feature engineering or data augmentation")
+        else:
+            suggestions.append(f"✅ Input dimension looks reasonable: {current_input_size} (typical: {typical_input_size})")
         
         # Preprocessing considerations
         preprocessing_memory = dataset_size * current_input_size * 4 * preprocessing_factor / (1024**3)
@@ -314,7 +350,7 @@ class PHMTrainingAnalyzer:
         
         # Task-specific dimension suggestions
         if task_type == "Bearing Fault Diagnosis":
-            if "1)" in input_dims:
+            if ",1)" in input_dims or ", 1)" in input_dims:
                 suggestions.append("🔧 Single-channel vibration data detected")
                 suggestions.append("💡 Consider multi-channel data (acceleration, velocity, displacement)")
             suggestions.append("📊 Optimal window size: 1024-4096 samples for bearing analysis")
@@ -323,7 +359,7 @@ class PHMTrainingAnalyzer:
             if current_input_size < 50:
                 suggestions.append("⏰ Time series might be too short for RUL prediction")
                 suggestions.append("💡 Use longer time windows (100+ timesteps) for better trends")
-            if "14)" in input_dims:
+            if ",14)" in input_dims or ", 14)" in input_dims:
                 suggestions.append("📈 Multi-sensor setup detected - good for RUL prediction")
         
         elif task_type == "Equipment Health Assessment":
@@ -339,7 +375,7 @@ class PHMTrainingAnalyzer:
             "typical_input": typical_input,
             "typical_output": typical_output,
             "preprocessing_memory_gb": f"{preprocessing_memory:.2f}",
-            "dimension_ratio": current_input_size / typical_input_size
+            "dimension_ratio": current_input_size / typical_input_size if typical_input_size > 0 else 1.0
         }
     
     def get_resource_optimization_strategy(self, task_type, dataset_size, model_params_m, memory_feasible):
@@ -375,24 +411,27 @@ class PHMTrainingAnalyzer:
             strategy.append("  • Use data sampling for initial experiments")
             strategy.append("  • Implement efficient data loading pipelines")
             strategy.append("  • Consider distributed training if available")
+        elif dataset_size < 5000:
+            strategy.append("📊 Small Dataset Strategies:")
+            strategy.append("  • Use data augmentation techniques")
+            strategy.append("  • Consider transfer learning")
+            strategy.append("  • Implement cross-validation")
         
         # Task-specific optimizations
-        config = self.base_configs[task_type]
-        preprocessing_factor = config["preprocessing_factor"]
-        
-        strategy.append(f"🎯 {task_type} Specific Optimizations:")
-        if task_type == "Bearing Fault Diagnosis":
-            strategy.append("  • Use STFT preprocessing for frequency analysis")
-            strategy.append("  • Implement class balancing for fault detection")
-        elif task_type == "Remaining Useful Life (RUL)":
-            strategy.append("  • Use sliding window approach for sequence data")
-            strategy.append("  • Implement progressive training strategies")
-        elif task_type == "Equipment Health Assessment":
-            strategy.append("  • Use multi-scale feature extraction")
-            strategy.append("  • Implement ensemble methods for robustness")
-        elif task_type == "Anomaly Detection":
-            strategy.append("  • Use reconstruction-based loss functions")
-            strategy.append("  • Implement threshold optimization techniques")
+        if task_type in self.base_configs:
+            strategy.append(f"🎯 {task_type} Specific Optimizations:")
+            if task_type == "Bearing Fault Diagnosis":
+                strategy.append("  • Use STFT preprocessing for frequency analysis")
+                strategy.append("  • Implement class balancing for fault detection")
+            elif task_type == "Remaining Useful Life (RUL)":
+                strategy.append("  • Use sliding window approach for sequence data")
+                strategy.append("  • Implement progressive training strategies")
+            elif task_type == "Equipment Health Assessment":
+                strategy.append("  • Use multi-scale feature extraction")
+                strategy.append("  • Implement ensemble methods for robustness")
+            elif task_type == "Anomaly Detection":
+                strategy.append("  • Use reconstruction-based loss functions")
+                strategy.append("  • Implement threshold optimization techniques")
         
         return strategy
     
@@ -407,6 +446,9 @@ class PHMTrainingAnalyzer:
         if training_time_hours > 24:
             recommendations.append("⏰ Very long training time - consider reducing epochs")
             recommendations.append("🔄 Use learning rate scheduling and early stopping")
+        elif training_time_hours < 0.5:
+            recommendations.append("⚡ Very short training time - might need more epochs")
+            recommendations.append("📈 Consider increasing model complexity")
         
         if not self.gpu_available:
             recommendations.append("🚀 Enable GPU acceleration for faster training")
@@ -481,7 +523,7 @@ def create_phm_gui():
     )
     
     batch_size_dropdown = widgets.Dropdown(
-        options=[8, 16, 32, 64, 128, 256],
+        options=[8, 16, 32, 64, 128, 256,512],
         value=32,
         description='Batch Size:',
         style={'description_width': 'initial'}
@@ -505,7 +547,7 @@ def create_phm_gui():
         with output_area:
             clear_output()
             
-            # Get input values
+            # Get input values - these are now dynamic based on GUI inputs
             task_type = task_dropdown.value
             input_dims = input_dims_text.value
             output_dims = output_dims_text.value
@@ -514,17 +556,17 @@ def create_phm_gui():
             batch_size = batch_size_dropdown.value
             dataset_size = dataset_size_text.value
             
-            # Perform analysis
+            # Perform analysis with current values
             time_est = analyzer.estimate_training_time(task_type, epochs, batch_size, dataset_size, model_params_m)
             memory_est = analyzer.estimate_memory_usage(batch_size, input_dims, output_dims, model_params_m)
             
-            # Get optimization suggestions
+            # Get optimization suggestions based on current inputs
             batch_suggestions = analyzer.get_optimal_batch_size_suggestions(task_type, dataset_size, model_params_m, input_dims)
             epoch_suggestions = analyzer.get_optimal_epoch_suggestions(task_type, dataset_size, batch_size)
             dimension_analysis = analyzer.get_data_dimension_analysis(task_type, input_dims, output_dims, dataset_size)
             optimization_strategy = analyzer.get_resource_optimization_strategy(task_type, dataset_size, model_params_m, memory_est['feasible'])
             
-            # Display results
+            # Display results with actual calculated values
             print("📊 Training Analysis Results:")
             print("=" * 50)
             print(f"Task: {task_type}")
@@ -537,17 +579,17 @@ def create_phm_gui():
             print()
             
             print("⏱️ Time Estimation:")
-            print(f"  • Per Epoch: {time_est['time_per_epoch']}")
-            print(f"  • Total Training: {time_est['total_time']}")
+            print(f"  • Per Epoch: {time_est['time_per_epoch']:.1f} minutes")
+            print(f"  • Total Training: {time_est['total_time']:.1f} minutes ({time_est['total_time']/60:.1f} hours)")
             print(f"  • Device: {time_est['device_type']}")
             print()
             
             print("🧠 Memory Estimation:")
-            print(f"  • Model Memory: {memory_est['model_memory']}")
-            print(f"  • Data Memory: {memory_est['data_memory']}")
-            print(f"  • Gradient Memory: {memory_est['gradient_memory']}")
-            print(f"  • Optimizer Memory: {memory_est['optimizer_memory']}")
-            print(f"  • Total Required: {memory_est['total_memory']}")
+            print(f"  • Model Memory: {memory_est['model_memory']:.2f} GB")
+            print(f"  • Data Memory: {memory_est['data_memory']:.3f} GB")
+            print(f"  • Gradient Memory: {memory_est['gradient_memory']:.2f} GB")
+            print(f"  • Optimizer Memory: {memory_est['optimizer_memory']:.2f} GB")
+            print(f"  • Total Required: {memory_est['total_memory']:.2f} GB")
             print(f"  • Feasible: {'✅ Yes' if memory_est['feasible'] else '❌ No'}")
             print()
             
@@ -583,8 +625,8 @@ def create_phm_gui():
                 print(f"  {strategy_item}")
             print()
             
-            # Get general recommendations
-            training_hours = float(time_est['total_time'].split()[0]) / 60
+            # Get general recommendations with actual calculated values
+            training_hours = time_est['total_time'] / 60
             recommendations = analyzer.get_recommendations(
                 task_type, memory_est['feasible'], training_hours
             )
@@ -594,20 +636,24 @@ def create_phm_gui():
                 print(f"  {rec}")
             print()
             
-            # Resource utilization
-            memory_usage_percent = float(memory_est['total_memory'].split()[0]) / analyzer.ram_gb * 100
+            # Resource utilization with dynamic values
+            memory_usage_percent = memory_est['total_memory'] / analyzer.ram_gb * 100
             print("📈 Resource Utilization Summary:")
             print(f"  • Memory Usage: {memory_usage_percent:.1f}% of available RAM")
             print(f"  • Estimated Peak Performance: {'GPU' if analyzer.gpu_available else 'CPU'} optimized")
             print(f"  • Preprocessing Overhead: {analyzer.base_configs[task_type]['preprocessing_factor']}x")
             
-            # Final recommendations summary
+            # Final recommendations summary with calculated values
             print("\n🎯 Final Configuration Recommendations:")
-            optimal_batch = batch_suggestions['suggested_sizes'][len(batch_suggestions['suggested_sizes'])//2] if batch_suggestions['suggested_sizes'] else 32
-            optimal_epochs = int(epoch_suggestions['epochs_range'].split('-')[0])
+            if batch_suggestions['suggested_sizes']:
+                optimal_batch = batch_suggestions['suggested_sizes'][len(batch_suggestions['suggested_sizes'])//2]
+            else:
+                optimal_batch = 32
+            optimal_epochs_str = epoch_suggestions['epochs_range'].split('-')[0]
+            optimal_epochs = int(optimal_epochs_str)
             print(f"  • Optimal Batch Size: {optimal_batch}")
             print(f"  • Optimal Epochs: {optimal_epochs}")
-            print(f"  • Memory Safety Margin: {(analyzer.ram_gb * 0.8 - float(memory_est['total_memory'].split()[0])):.1f} GB remaining")
+            print(f"  • Memory Safety Margin: {(analyzer.ram_gb * 0.8 - memory_est['total_memory']):.1f} GB remaining")
             
             # Training schedule suggestion
             current_hour = datetime.now().hour
