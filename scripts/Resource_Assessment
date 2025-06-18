@@ -614,4 +614,4 @@ def create_phm_gui():
 # Create and display the GUI
 print("🚀 PHM Predictive Maintenance Training Environment Analyzer")
 print("=" * 60)
-create_phm_gui()
+create_phm_resource_assessment()
