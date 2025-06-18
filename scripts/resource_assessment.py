@@ -696,6 +696,121 @@ def create_phm_resource_assessment():
     display(input_box)
     display(output_area)
 
+# Create simplified GUI interface for Colab
+def create_phm_gui():
+    """Simplified GUI interface that automatically loads widgets in Colab"""
+    analyzer = PHMTrainingAnalyzer()
+    
+    # Display hardware info
+    hw_info = analyzer.get_hardware_info()
+    print("🖥️ Hardware Information:")
+    print(f"  • CPU Cores: {hw_info['physical_cpu_cores']} physical, {hw_info['logical_cpu_cores']} logical")
+    print(f"  • RAM: {hw_info['total_ram_gb']} GB")
+    print(f"  • GPU: {hw_info['gpu_name']}")
+    if hw_info['gpu_available']:
+        print(f"  • GPU Memory: {hw_info['gpu_memory_gb']:.1f} GB")
+    print(f"  • Platform: {hw_info['platform']}")
+    print("-" * 60)
+    
+    # Import widgets and display here (assuming Colab environment)
+    import ipywidgets as widgets
+    from IPython.display import display, clear_output
+    
+    # Create widgets
+    task_dropdown = widgets.Dropdown(
+        options=list(analyzer.base_configs.keys()),
+        value=list(analyzer.base_configs.keys())[0],
+        description='Task Type:',
+        style={'description_width': 'initial'}
+    )
+    
+    input_dims_text = widgets.Text(
+        value="(2048, 1)",
+        description='Input Dims:',
+        placeholder='e.g., (2048, 1) or (100, 14)',
+        style={'description_width': 'initial'}
+    )
+    
+    output_dims_text = widgets.Text(
+        value="4",
+        description='Output Dims:',
+        placeholder='e.g., 4 or 1 or 5 classes',
+        style={'description_width': 'initial'}
+    )
+    
+    model_params_text = widgets.FloatText(
+        value=10.0,
+        description='Model Params (M):',
+        style={'description_width': 'initial'}
+    )
+    
+    epochs_slider = widgets.IntSlider(
+        value=100,
+        min=10,
+        max=500,
+        step=10,
+        description='Epochs:',
+        style={'description_width': 'initial'}
+    )
+    
+    batch_size_dropdown = widgets.Dropdown(
+        options=[8, 16, 32, 64, 128, 256],
+        value=32,
+        description='Batch Size:',
+        style={'description_width': 'initial'}
+    )
+    
+    dataset_size_text = widgets.IntText(
+        value=10000,
+        description='Dataset Size:',
+        style={'description_width': 'initial'}
+    )
+    
+    analyze_button = widgets.Button(
+        description='🔍 Analyze Training Configuration',
+        button_style='info',
+        layout=widgets.Layout(width='300px')
+    )
+    
+    output_area = widgets.Output()
+    
+    def on_analyze_click(b):
+        with output_area:
+            clear_output()
+            
+            # Get input values
+            task_type = task_dropdown.value
+            input_dims = input_dims_text.value
+            output_dims = output_dims_text.value
+            model_params_m = model_params_text.value
+            epochs = epochs_slider.value
+            batch_size = batch_size_dropdown.value
+            dataset_size = dataset_size_text.value
+            
+            # Use console analysis function
+            analyze_configuration_console(task_type, input_dims, output_dims, 
+                                        model_params_m, epochs, batch_size, dataset_size)
+    
+    analyze_button.on_click(on_analyze_click)
+    
+    # Layout
+    input_box = widgets.VBox([
+        widgets.HTML("<h3>🔧 PHM Training Configuration</h3>"),
+        task_dropdown,
+        widgets.HTML("<b>Model Specifications:</b>"),
+        input_dims_text,
+        output_dims_text,
+        model_params_text,
+        widgets.HTML("<b>Training Parameters:</b>"),
+        epochs_slider,
+        batch_size_dropdown,
+        dataset_size_text,
+        analyze_button
+    ])
+    
+    display(input_box)
+    display(output_area)
+
 # Main execution
 if __name__ == "__main__":
     print("🚀 PHM Predictive Maintenance Training Environment Analyzer")
@@ -704,11 +819,19 @@ if __name__ == "__main__":
     # Check environment and run appropriate interface
     try:
         from IPython import get_ipython
-        if get_ipython() is not None and widgets_available:
-            # Running in Jupyter/Colab with widgets
-            create_phm_resource_assessment()
+        if get_ipython() is not None:
+            # Running in Jupyter/Colab - try to create GUI
+            try:
+                import ipywidgets as widgets
+                from IPython.display import display, clear_output
+                create_phm_gui()
+                print("✅ Interactive GUI loaded successfully!")
+                print("Use the widgets above to analyze different training configurations.")
+            except ImportError:
+                print("⚠️ ipywidgets not available. Running console analysis with default parameters...")
+                analyze_configuration_console()
         else:
-            # Running in Jupyter/Colab without widgets or command line
+            # Running as standalone script
             print("Running console analysis with default parameters...")
             analyze_configuration_console()
     except ImportError:
@@ -717,8 +840,22 @@ if __name__ == "__main__":
         analyze_configuration_console()
 else:
     # Being imported as module - show GUI if available
-    if widgets_available:
-        create_phm_resource_assessment()
-    else:
+    try:
+        from IPython import get_ipython
+        if get_ipython() is not None:
+            # In Jupyter/Colab environment
+            try:
+                import ipywidgets as widgets
+                from IPython.display import display, clear_output
+                create_phm_gui()
+                print("✅ Interactive GUI loaded successfully!")
+                print("Use the widgets above to analyze different training configurations.")
+            except ImportError:
+                print("🚀 PHM Training Analyzer imported successfully!")
+                print("Use analyze_configuration_console() for analysis")
+        else:
+            print("🚀 PHM Training Analyzer imported successfully!")
+            print("Use analyze_configuration_console() for analysis")
+    except ImportError:
         print("🚀 PHM Training Analyzer imported successfully!")
         print("Use analyze_configuration_console() for analysis")
