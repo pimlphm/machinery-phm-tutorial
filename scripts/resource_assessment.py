@@ -24,48 +24,20 @@ Core Functions:
 - Resource optimization strategies for CPU and GPU environments
 - Interactive GUI for real-time configuration analysis and recommendations
 """
+# 🚀 PHM Predictive Maintenance Training Environment Analysis & Resource Assessment
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import psutil
 import platform
 import time
+import torch
+import tensorflow as tf
 from datetime import datetime
+import ipywidgets as widgets
+from IPython.display import display, clear_output
 import warnings
 warnings.filterwarnings('ignore')
-
-# Import with fallback handling for optional dependencies
-try:
-    import torch
-    torch_available = True
-except ImportError:
-    torch_available = False
-    print("Warning: PyTorch not available. GPU detection will be limited.")
-
-try:
-    import tensorflow as tf
-    tf_available = True
-except ImportError:
-    tf_available = False
-    print("Warning: TensorFlow not available. Some features may be limited.")
-
-# Check if running in Jupyter/Colab environment
-try:
-    from IPython import get_ipython
-    if get_ipython() is not None:
-        # Running in Jupyter/Colab
-        try:
-            import ipywidgets as widgets
-            from IPython.display import display, clear_output
-            widgets_available = True
-        except ImportError:
-            widgets_available = False
-            print("Warning: ipywidgets not available. GUI functionality will be limited.")
-    else:
-        # Running as standalone script
-        widgets_available = False
-except ImportError:
-    widgets_available = False
 
 class PHMTrainingAnalyzer:
     def __init__(self):
@@ -117,7 +89,7 @@ class PHMTrainingAnalyzer:
     
     def _detect_hardware(self):
         """Detect available hardware resources"""
-        if torch_available and torch.cuda.is_available():
+        if torch.cuda.is_available():
             self.gpu_available = True
             self.gpu_name = torch.cuda.get_device_name(0)
             self.gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
@@ -456,249 +428,8 @@ class PHMTrainingAnalyzer:
         
         return recommendations
 
-def analyze_configuration_console(task_type="Bearing Fault Diagnosis", 
-                                input_dims="(2048, 1)", 
-                                output_dims="4", 
-                                model_params_m=10.0, 
-                                epochs=100, 
-                                batch_size=32, 
-                                dataset_size=10000):
-    """Console-based analysis function for command-line usage"""
-    analyzer = PHMTrainingAnalyzer()
-    
-    # Display hardware info
-    hw_info = analyzer.get_hardware_info()
-    print("🖥️ Hardware Information:")
-    print(f"  • CPU Cores: {hw_info['physical_cpu_cores']} physical, {hw_info['logical_cpu_cores']} logical")
-    print(f"  • RAM: {hw_info['total_ram_gb']} GB")
-    print(f"  • GPU: {hw_info['gpu_name']}")
-    if hw_info['gpu_available']:
-        print(f"  • GPU Memory: {hw_info['gpu_memory_gb']:.1f} GB")
-    print(f"  • Platform: {hw_info['platform']}")
-    print("-" * 60)
-    
-    # Perform analysis
-    time_est = analyzer.estimate_training_time(task_type, epochs, batch_size, dataset_size, model_params_m)
-    memory_est = analyzer.estimate_memory_usage(batch_size, input_dims, output_dims, model_params_m)
-    
-    # Get optimization suggestions
-    batch_suggestions = analyzer.get_optimal_batch_size_suggestions(task_type, dataset_size, model_params_m, input_dims)
-    epoch_suggestions = analyzer.get_optimal_epoch_suggestions(task_type, dataset_size, batch_size)
-    dimension_analysis = analyzer.get_data_dimension_analysis(task_type, input_dims, output_dims, dataset_size)
-    optimization_strategy = analyzer.get_resource_optimization_strategy(task_type, dataset_size, model_params_m, memory_est['feasible'])
-    
-    # Display results
-    print("📊 Training Analysis Results:")
-    print("=" * 50)
-    print(f"Task: {task_type}")
-    print(f"Model Architecture: {analyzer.base_configs[task_type]['model_arch']}")
-    print(f"Input Dimensions: {input_dims}")
-    print(f"Output Dimensions: {output_dims}")
-    print(f"Model Parameters: {model_params_m}M")
-    print(f"Configuration: {epochs} epochs, batch size {batch_size}")
-    print(f"Dataset Size: {dataset_size:,} samples")
-    print()
-    
-    print("⏱️ Time Estimation:")
-    print(f"  • Per Epoch: {time_est['time_per_epoch']}")
-    print(f"  • Total Training: {time_est['total_time']}")
-    print(f"  • Device: {time_est['device_type']}")
-    print()
-    
-    print("🧠 Memory Estimation:")
-    print(f"  • Model Memory: {memory_est['model_memory']}")
-    print(f"  • Data Memory: {memory_est['data_memory']}")
-    print(f"  • Gradient Memory: {memory_est['gradient_memory']}")
-    print(f"  • Optimizer Memory: {memory_est['optimizer_memory']}")
-    print(f"  • Total Required: {memory_est['total_memory']}")
-    print(f"  • Feasible: {'✅ Yes' if memory_est['feasible'] else '❌ No'}")
-    print()
-    
-    # Optimization Suggestions
-    print("🎯 Batch Size Optimization:")
-    print(f"  • Recommended Range: {batch_suggestions['optimal_range']}")
-    print(f"  • Feasible Sizes: {batch_suggestions['suggested_sizes']}")
-    print(f"  • Max Theoretical: {batch_suggestions['max_theoretical']}")
-    print(f"  • Rationale: {batch_suggestions['reason']}")
-    if batch_suggestions['memory_constraint']:
-        print("  ⚠️ Memory constraints detected - consider smaller batch sizes")
-    print()
-    
-    print("📅 Epoch Optimization:")
-    print(f"  • Recommended Range: {epoch_suggestions['epochs_range']}")
-    print(f"  • Steps per Epoch: {epoch_suggestions['steps_per_epoch']}")
-    print(f"  • Early Stopping Patience: {epoch_suggestions['early_stopping_patience']}")
-    print(f"  • Rationale: {epoch_suggestions['reason']}")
-    print()
-    
-    print("📏 Data Dimension Analysis:")
-    print(f"  • Typical Input for Task: {dimension_analysis['typical_input']}")
-    print(f"  • Typical Output for Task: {dimension_analysis['typical_output']}")
-    print(f"  • Preprocessing Memory: {dimension_analysis['preprocessing_memory_gb']} GB")
-    print(f"  • Dimension Ratio: {dimension_analysis['dimension_ratio']:.2f}x typical")
-    print("  • Suggestions:")
-    for suggestion in dimension_analysis['suggestions']:
-        print(f"    {suggestion}")
-    print()
-    
-    print("🔧 Resource Optimization Strategy:")
-    for strategy_item in optimization_strategy:
-        print(f"  {strategy_item}")
-    print()
-    
-    # Get general recommendations
-    training_hours = float(time_est['total_time'].split()[0]) / 60
-    recommendations = analyzer.get_recommendations(
-        task_type, memory_est['feasible'], training_hours
-    )
-    
-    print("💡 Additional Recommendations:")
-    for rec in recommendations:
-        print(f"  {rec}")
-    print()
-    
-    # Resource utilization
-    memory_usage_percent = float(memory_est['total_memory'].split()[0]) / analyzer.ram_gb * 100
-    print("📈 Resource Utilization Summary:")
-    print(f"  • Memory Usage: {memory_usage_percent:.1f}% of available RAM")
-    print(f"  • Estimated Peak Performance: {'GPU' if analyzer.gpu_available else 'CPU'} optimized")
-    print(f"  • Preprocessing Overhead: {analyzer.base_configs[task_type]['preprocessing_factor']}x")
-    
-    # Final recommendations summary
-    print("\n🎯 Final Configuration Recommendations:")
-    optimal_batch = batch_suggestions['suggested_sizes'][len(batch_suggestions['suggested_sizes'])//2] if batch_suggestions['suggested_sizes'] else 32
-    optimal_epochs = int(epoch_suggestions['epochs_range'].split('-')[0])
-    print(f"  • Optimal Batch Size: {optimal_batch}")
-    print(f"  • Optimal Epochs: {optimal_epochs}")
-    print(f"  • Memory Safety Margin: {(analyzer.ram_gb * 0.8 - float(memory_est['total_memory'].split()[0])):.1f} GB remaining")
-    
-    # Training schedule suggestion
-    current_hour = datetime.now().hour
-    print(f"\n🕐 Current Time: {datetime.now().strftime('%H:%M')}")
-    if 9 <= current_hour <= 17:
-        print("  💼 Business hours - Good for debugging and hyperparameter tuning")
-    else:
-        print("  🌙 Off-hours - Ideal for long training runs")
-
-# Create GUI Interface (only if widgets are available)
-def create_phm_resource_assessment():
-    if not widgets_available:
-        print("⚠️ GUI not available. Use console version instead.")
-        print("Example usage:")
-        print("analyze_configuration_console()")
-        return
-    
-    analyzer = PHMTrainingAnalyzer()
-    
-    # Display hardware info
-    hw_info = analyzer.get_hardware_info()
-    print("🖥️ Hardware Information:")
-    print(f"  • CPU Cores: {hw_info['physical_cpu_cores']} physical, {hw_info['logical_cpu_cores']} logical")
-    print(f"  • RAM: {hw_info['total_ram_gb']} GB")
-    print(f"  • GPU: {hw_info['gpu_name']}")
-    if hw_info['gpu_available']:
-        print(f"  • GPU Memory: {hw_info['gpu_memory_gb']:.1f} GB")
-    print(f"  • Platform: {hw_info['platform']}")
-    print("-" * 60)
-    
-    # Create widgets
-    task_dropdown = widgets.Dropdown(
-        options=list(analyzer.base_configs.keys()),
-        value=list(analyzer.base_configs.keys())[0],
-        description='Task Type:',
-        style={'description_width': 'initial'}
-    )
-    
-    input_dims_text = widgets.Text(
-        value="(2048, 1)",
-        description='Input Dims:',
-        placeholder='e.g., (2048, 1) or (100, 14)',
-        style={'description_width': 'initial'}
-    )
-    
-    output_dims_text = widgets.Text(
-        value="4",
-        description='Output Dims:',
-        placeholder='e.g., 4 or 1 or 5 classes',
-        style={'description_width': 'initial'}
-    )
-    
-    model_params_text = widgets.FloatText(
-        value=10.0,
-        description='Model Params (M):',
-        style={'description_width': 'initial'}
-    )
-    
-    epochs_slider = widgets.IntSlider(
-        value=100,
-        min=10,
-        max=500,
-        step=10,
-        description='Epochs:',
-        style={'description_width': 'initial'}
-    )
-    
-    batch_size_dropdown = widgets.Dropdown(
-        options=[8, 16, 32, 64, 128, 256],
-        value=32,
-        description='Batch Size:',
-        style={'description_width': 'initial'}
-    )
-    
-    dataset_size_text = widgets.IntText(
-        value=10000,
-        description='Dataset Size:',
-        style={'description_width': 'initial'}
-    )
-    
-    analyze_button = widgets.Button(
-        description='🔍 Analyze Training Configuration',
-        button_style='info',
-        layout=widgets.Layout(width='300px')
-    )
-    
-    output_area = widgets.Output()
-    
-    def on_analyze_click(b):
-        with output_area:
-            clear_output()
-            
-            # Get input values
-            task_type = task_dropdown.value
-            input_dims = input_dims_text.value
-            output_dims = output_dims_text.value
-            model_params_m = model_params_text.value
-            epochs = epochs_slider.value
-            batch_size = batch_size_dropdown.value
-            dataset_size = dataset_size_text.value
-            
-            # Use console analysis function
-            analyze_configuration_console(task_type, input_dims, output_dims, 
-                                        model_params_m, epochs, batch_size, dataset_size)
-    
-    analyze_button.on_click(on_analyze_click)
-    
-    # Layout
-    input_box = widgets.VBox([
-        widgets.HTML("<h3>🔧 PHM Training Configuration</h3>"),
-        task_dropdown,
-        widgets.HTML("<b>Model Specifications:</b>"),
-        input_dims_text,
-        output_dims_text,
-        model_params_text,
-        widgets.HTML("<b>Training Parameters:</b>"),
-        epochs_slider,
-        batch_size_dropdown,
-        dataset_size_text,
-        analyze_button
-    ])
-    
-    display(input_box)
-    display(output_area)
-
-# Create simplified GUI interface for Colab
+# Create GUI Interface
 def create_phm_gui():
-    """Simplified GUI interface that automatically loads widgets in Colab"""
     analyzer = PHMTrainingAnalyzer()
     
     # Display hardware info
@@ -711,10 +442,6 @@ def create_phm_gui():
         print(f"  • GPU Memory: {hw_info['gpu_memory_gb']:.1f} GB")
     print(f"  • Platform: {hw_info['platform']}")
     print("-" * 60)
-    
-    # Import widgets and display here (assuming Colab environment)
-    import ipywidgets as widgets
-    from IPython.display import display, clear_output
     
     # Create widgets
     task_dropdown = widgets.Dropdown(
@@ -787,9 +514,108 @@ def create_phm_gui():
             batch_size = batch_size_dropdown.value
             dataset_size = dataset_size_text.value
             
-            # Use console analysis function
-            analyze_configuration_console(task_type, input_dims, output_dims, 
-                                        model_params_m, epochs, batch_size, dataset_size)
+            # Perform analysis
+            time_est = analyzer.estimate_training_time(task_type, epochs, batch_size, dataset_size, model_params_m)
+            memory_est = analyzer.estimate_memory_usage(batch_size, input_dims, output_dims, model_params_m)
+            
+            # Get optimization suggestions
+            batch_suggestions = analyzer.get_optimal_batch_size_suggestions(task_type, dataset_size, model_params_m, input_dims)
+            epoch_suggestions = analyzer.get_optimal_epoch_suggestions(task_type, dataset_size, batch_size)
+            dimension_analysis = analyzer.get_data_dimension_analysis(task_type, input_dims, output_dims, dataset_size)
+            optimization_strategy = analyzer.get_resource_optimization_strategy(task_type, dataset_size, model_params_m, memory_est['feasible'])
+            
+            # Display results
+            print("📊 Training Analysis Results:")
+            print("=" * 50)
+            print(f"Task: {task_type}")
+            print(f"Model Architecture: {analyzer.base_configs[task_type]['model_arch']}")
+            print(f"Input Dimensions: {input_dims}")
+            print(f"Output Dimensions: {output_dims}")
+            print(f"Model Parameters: {model_params_m}M")
+            print(f"Configuration: {epochs} epochs, batch size {batch_size}")
+            print(f"Dataset Size: {dataset_size:,} samples")
+            print()
+            
+            print("⏱️ Time Estimation:")
+            print(f"  • Per Epoch: {time_est['time_per_epoch']}")
+            print(f"  • Total Training: {time_est['total_time']}")
+            print(f"  • Device: {time_est['device_type']}")
+            print()
+            
+            print("🧠 Memory Estimation:")
+            print(f"  • Model Memory: {memory_est['model_memory']}")
+            print(f"  • Data Memory: {memory_est['data_memory']}")
+            print(f"  • Gradient Memory: {memory_est['gradient_memory']}")
+            print(f"  • Optimizer Memory: {memory_est['optimizer_memory']}")
+            print(f"  • Total Required: {memory_est['total_memory']}")
+            print(f"  • Feasible: {'✅ Yes' if memory_est['feasible'] else '❌ No'}")
+            print()
+            
+            # Optimization Suggestions
+            print("🎯 Batch Size Optimization:")
+            print(f"  • Recommended Range: {batch_suggestions['optimal_range']}")
+            print(f"  • Feasible Sizes: {batch_suggestions['suggested_sizes']}")
+            print(f"  • Max Theoretical: {batch_suggestions['max_theoretical']}")
+            print(f"  • Rationale: {batch_suggestions['reason']}")
+            if batch_suggestions['memory_constraint']:
+                print("  ⚠️ Memory constraints detected - consider smaller batch sizes")
+            print()
+            
+            print("📅 Epoch Optimization:")
+            print(f"  • Recommended Range: {epoch_suggestions['epochs_range']}")
+            print(f"  • Steps per Epoch: {epoch_suggestions['steps_per_epoch']}")
+            print(f"  • Early Stopping Patience: {epoch_suggestions['early_stopping_patience']}")
+            print(f"  • Rationale: {epoch_suggestions['reason']}")
+            print()
+            
+            print("📏 Data Dimension Analysis:")
+            print(f"  • Typical Input for Task: {dimension_analysis['typical_input']}")
+            print(f"  • Typical Output for Task: {dimension_analysis['typical_output']}")
+            print(f"  • Preprocessing Memory: {dimension_analysis['preprocessing_memory_gb']} GB")
+            print(f"  • Dimension Ratio: {dimension_analysis['dimension_ratio']:.2f}x typical")
+            print("  • Suggestions:")
+            for suggestion in dimension_analysis['suggestions']:
+                print(f"    {suggestion}")
+            print()
+            
+            print("🔧 Resource Optimization Strategy:")
+            for strategy_item in optimization_strategy:
+                print(f"  {strategy_item}")
+            print()
+            
+            # Get general recommendations
+            training_hours = float(time_est['total_time'].split()[0]) / 60
+            recommendations = analyzer.get_recommendations(
+                task_type, memory_est['feasible'], training_hours
+            )
+            
+            print("💡 Additional Recommendations:")
+            for rec in recommendations:
+                print(f"  {rec}")
+            print()
+            
+            # Resource utilization
+            memory_usage_percent = float(memory_est['total_memory'].split()[0]) / analyzer.ram_gb * 100
+            print("📈 Resource Utilization Summary:")
+            print(f"  • Memory Usage: {memory_usage_percent:.1f}% of available RAM")
+            print(f"  • Estimated Peak Performance: {'GPU' if analyzer.gpu_available else 'CPU'} optimized")
+            print(f"  • Preprocessing Overhead: {analyzer.base_configs[task_type]['preprocessing_factor']}x")
+            
+            # Final recommendations summary
+            print("\n🎯 Final Configuration Recommendations:")
+            optimal_batch = batch_suggestions['suggested_sizes'][len(batch_suggestions['suggested_sizes'])//2] if batch_suggestions['suggested_sizes'] else 32
+            optimal_epochs = int(epoch_suggestions['epochs_range'].split('-')[0])
+            print(f"  • Optimal Batch Size: {optimal_batch}")
+            print(f"  • Optimal Epochs: {optimal_epochs}")
+            print(f"  • Memory Safety Margin: {(analyzer.ram_gb * 0.8 - float(memory_est['total_memory'].split()[0])):.1f} GB remaining")
+            
+            # Training schedule suggestion
+            current_hour = datetime.now().hour
+            print(f"\n🕐 Current Time: {datetime.now().strftime('%H:%M')}")
+            if 9 <= current_hour <= 17:
+                print("  💼 Business hours - Good for debugging and hyperparameter tuning")
+            else:
+                print("  🌙 Off-hours - Ideal for long training runs")
     
     analyze_button.on_click(on_analyze_click)
     
@@ -811,51 +637,7 @@ def create_phm_gui():
     display(input_box)
     display(output_area)
 
-# Main execution
-if __name__ == "__main__":
-    print("🚀 PHM Predictive Maintenance Training Environment Analyzer")
-    print("=" * 60)
-    
-    # Check environment and run appropriate interface
-    try:
-        from IPython import get_ipython
-        if get_ipython() is not None:
-            # Running in Jupyter/Colab - try to create GUI
-            try:
-                import ipywidgets as widgets
-                from IPython.display import display, clear_output
-                create_phm_gui()
-                print("✅ Interactive GUI loaded successfully!")
-                print("Use the widgets above to analyze different training configurations.")
-            except ImportError:
-                print("⚠️ ipywidgets not available. Running console analysis with default parameters...")
-                analyze_configuration_console()
-        else:
-            # Running as standalone script
-            print("Running console analysis with default parameters...")
-            analyze_configuration_console()
-    except ImportError:
-        # Running as standalone script
-        print("Running console analysis with default parameters...")
-        analyze_configuration_console()
-else:
-    # Being imported as module - show GUI if available
-    try:
-        from IPython import get_ipython
-        if get_ipython() is not None:
-            # In Jupyter/Colab environment
-            try:
-                import ipywidgets as widgets
-                from IPython.display import display, clear_output
-                create_phm_gui()
-                print("✅ Interactive GUI loaded successfully!")
-                print("Use the widgets above to analyze different training configurations.")
-            except ImportError:
-                print("🚀 PHM Training Analyzer imported successfully!")
-                print("Use analyze_configuration_console() for analysis")
-        else:
-            print("🚀 PHM Training Analyzer imported successfully!")
-            print("Use analyze_configuration_console() for analysis")
-    except ImportError:
-        print("🚀 PHM Training Analyzer imported successfully!")
-        print("Use analyze_configuration_console() for analysis")
+# Create and display the GUI
+print("🚀 PHM Predictive Maintenance Training Environment Analyzer")
+print("=" * 60)
+create_phm_gui()
