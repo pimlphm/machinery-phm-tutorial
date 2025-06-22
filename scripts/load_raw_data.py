@@ -6,9 +6,6 @@ import numpy as np
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 
-# Clone the repository first
-!git clone --depth 1 https://github.com/pimlphm/machinery-phm-tutorial.git
-
 # === User Interactive Interface for Dataset Selection ===
 def create_dataset_selector():
     """Create dataset selection interface"""
