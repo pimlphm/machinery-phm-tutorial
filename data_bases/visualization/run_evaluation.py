@@ -49,12 +49,13 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     try:
         print("\n🔍 Computing SHAP feature importance...")
         background = X_test_scaled[np.random.choice(len(X_test_scaled), 100, replace=False)]
-        explainer = shap.DeepExplainer(model, background)
+        explainer = shap.GradientExplainer(model, background)
         shap_values = explainer.shap_values(X_test_scaled)
         shap_mean = np.mean(np.abs(np.array(shap_values)), axis=(0,1))
     except Exception as e:
         print(f"⚠️ SHAP failed: {e}")
         shap_mean = np.abs(np.random.randn(X_test_scaled.shape[1]))
+
 
     # Reconstruction Error
     try:
