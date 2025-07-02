@@ -8,7 +8,7 @@ from sklearn.metrics import confusion_matrix, classification_report, accuracy_sc
 import shap
 import tensorflow as tf
 
-def run_model_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
+def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     """
     Evaluates a trained Keras model:
       - prints classification report and accuracy
