@@ -83,4 +83,5 @@ def load_turbofan_data(extract_path="turbofan_data"):
     
     print(f"All datasets processed successfully, saved in: {extract_path}")
     return datasets
-datasets = load_turbofan_data('/content/turbofan_data')
+if __name__ == "__main__":
+    datasets = load_turbofan_data('/content/turbofan_data')
