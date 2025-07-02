@@ -66,15 +66,17 @@ def create_run_button(X_test_scaled, y_test_cat):
             return
 
         # === Built-in Keras metrics ===
-        print("\n📉 Evaluating model with model.evaluate():")
-        results = model.evaluate(X_test_scaled, y_test_cat, verbose=0)
-        for name, value in zip(model.metrics_names, results):
-            print(f"{name}: {value:.4f}")
-
-        # === Additional sklearn metrics ===
-        print("\n📊 Classification Report (sklearn):")
-        print(classification_report(y_true, y_pred, target_names=class_names, digits=3))
-        print(f"✅ Accuracy (from sklearn): {accuracy_score(y_true, y_pred) * 100:.2f}%")
+        # === Classification Report ===
+        print("\n📊 Classification Report:")
+        try:
+            report = classification_report(y_true, y_pred, target_names=class_names, digits=3)
+        except:
+            report = classification_report(y_true, y_pred, digits=3)
+        print(report)
+        
+        # Print global accuracy
+        acc = accuracy_score(y_true, y_pred) * 100
+        print(f"✅ Overall Accuracy: {acc:.2f}%")
 
         # === SHAP Feature Importance ===
         try:
