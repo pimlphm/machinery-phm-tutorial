@@ -182,6 +182,13 @@ def main(extract_path=DEFAULT_EXTRACT_PATH):
         print("Failed to download dataset")
         return None
 
+# === 使用方法 ===
+# 1. 下载此文件:
+# !wget https://raw.githubusercontent.com/pimlphm/machinery-phm-tutorial/main/data_bases/visualization/turbofan_data_loader.py -O turbofan_data_loader.py
+
+# 2. 导入和使用:
+# from turbofan_data_loader import download_and_extract_turbofan_data, load_cmapss_datasets, main
+
 # === Execution ===
 if __name__ == "__main__":
     datasets = main()
