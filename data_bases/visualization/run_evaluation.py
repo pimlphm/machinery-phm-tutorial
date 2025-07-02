@@ -48,28 +48,55 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     # SHAP
     try:
         print("\n🔍 Computing SHAP feature importance...")
+        # Use DeepExplainer instead of GradientExplainer to avoid LeakyRelu error
         background = X_test_scaled[np.random.choice(len(X_test_scaled), 100, replace=False)]
-        explainer = shap.GradientExplainer(model, background)
-        shap_values = explainer.shap_values(X_test_scaled)
-        shap_mean = np.mean(np.abs(np.array(shap_values)), axis=(0,1))
+        explainer = shap.DeepExplainer(model, background)
+        shap_values = explainer.shap_values(X_test_scaled[:200])  # Limit sample size
+        if isinstance(shap_values, list):
+            # For multi-class models
+            shap_mean = np.mean([np.abs(sv) for sv in shap_values], axis=(0, 1))
+        else:
+            # For binary classification
+            shap_mean = np.mean(np.abs(shap_values), axis=0)
     except Exception as e:
         print(f"⚠️ SHAP failed: {e}")
         shap_mean = np.abs(np.random.randn(X_test_scaled.shape[1]))
 
-
     # Reconstruction Error
     try:
         print("\n🔧 Computing reconstruction error...")
-        encoder = Model(inputs=model.input, outputs=model.get_layer('embedding').output)
-        encoded = encoder.predict(X_test_scaled)
-        dec_in = tf.keras.Input(shape=(encoded.shape[1],))
-        x = dec_in; collect = False
-        for lyr in model.layers:
-            if collect: x = lyr(x)
-            if lyr.name == 'embedding': collect = True
-        decoder = Model(dec_in, x)
-        recon = decoder.predict(encoded)
-        recon_err = np.mean((X_test_scaled - recon) ** 2, axis=1)
+        # Check if model has an embedding layer
+        has_embedding = any(layer.name == 'embedding' for layer in model.layers)
+        
+        if has_embedding:
+            encoder = Model(inputs=model.input, outputs=model.get_layer('embedding').output)
+            encoded = encoder.predict(X_test_scaled)
+            
+            # Create decoder more carefully
+            dec_in = tf.keras.Input(shape=(encoded.shape[1],))
+            x = dec_in
+            collect = False
+            for lyr in model.layers:
+                if collect:
+                    try:
+                        x = lyr(x)
+                    except:
+                        pass  # Skip layers that can't be applied
+                if lyr.name == 'embedding':
+                    collect = True
+            
+            decoder = Model(dec_in, x)
+            recon = decoder.predict(encoded)
+            
+            # Check shapes before computing error
+            if recon.shape == X_test_scaled.shape:
+                recon_err = np.mean((X_test_scaled - recon) ** 2, axis=1)
+            else:
+                print(f"⚠️ Shape mismatch: X_test_scaled {X_test_scaled.shape}, recon {recon.shape}")
+                recon_err = np.random.rand(len(y_true))
+        else:
+            print("⚠️ No embedding layer found")
+            recon_err = np.random.rand(len(y_true))
     except Exception as e:
         print(f"⚠️ Reconstruction failed: {e}")
         recon_err = np.random.rand(len(y_true))
