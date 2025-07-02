@@ -59,38 +59,58 @@ class SimplePHMAnalyzer:
         except:
             pass
     
-    def analyze_keras_model(self, model, X_train_shape, y_train_shape, batch_size):
+    def analyze_keras_model(self, model, X_train_shape, y_train_shapes, batch_size):
         """Analyze existing Keras model parameters and estimate resources"""
         try:
             # Get model parameters
             total_params = model.count_params()
-            trainable_params = sum([np.prod(layer.get_weights()[0].shape) + np.prod(layer.get_weights()[1].shape) 
-                                  for layer in model.layers if layer.get_weights()])
+            trainable_params = sum([np.prod(w.shape) for layer in model.layers for w in layer.get_weights()])
             
             model_params_m = total_params / 1e6
             
-            # Extract data dimensions
-            if len(X_train_shape) == 3:  # (samples, timesteps, features)
-                input_features = X_train_shape[1] * X_train_shape[2]  # timesteps * features
-                samples = X_train_shape[0]
-            elif len(X_train_shape) == 2:  # (samples, features)
-                input_features = X_train_shape[1]
-                samples = X_train_shape[0]
+            # Extract data dimensions - support multiple input dimensions
+            if isinstance(X_train_shape, (list, tuple)) and len(X_train_shape) > 0:
+                if len(X_train_shape) == 2:  # (samples, features)
+                    input_features = X_train_shape[1]
+                    samples = X_train_shape[0]
+                elif len(X_train_shape) == 3:  # (samples, timesteps, features)
+                    input_features = X_train_shape[1] * X_train_shape[2]
+                    samples = X_train_shape[0]
+                else:
+                    input_features = np.prod(X_train_shape[1:])
+                    samples = X_train_shape[0]
             else:
-                input_features = np.prod(X_train_shape[1:])
-                samples = X_train_shape[0]
+                raise ValueError("Invalid X_train_shape format")
             
-            output_features = y_train_shape[-1] if len(y_train_shape) > 1 else 1
+            # Handle multiple outputs
+            total_output_features = 0
+            if isinstance(y_train_shapes, (list, tuple)):
+                if isinstance(y_train_shapes[0], (list, tuple)):
+                    # Multiple outputs: [(samples, features1), (samples, features2), ...]
+                    for y_shape in y_train_shapes:
+                        if len(y_shape) == 1:  # (samples,) - single value output
+                            total_output_features += 1
+                        else:  # (samples, features) - multi-dimensional output
+                            total_output_features += y_shape[1] if len(y_shape) > 1 else 1
+                else:
+                    # Single output: (samples, features) or (samples,)
+                    if len(y_train_shapes) == 1:
+                        total_output_features = 1
+                    else:
+                        total_output_features = y_train_shapes[1] if len(y_train_shapes) > 1 else 1
+            else:
+                total_output_features = 1
             
             return {
                 "total_params": total_params,
                 "trainable_params": trainable_params,
                 "model_params_m": model_params_m,
                 "input_features": input_features,
-                "output_features": output_features,
+                "output_features": total_output_features,
                 "samples": samples,
                 "batch_size": batch_size,
-                "batches_per_epoch": samples // batch_size
+                "batches_per_epoch": samples // batch_size,
+                "num_outputs": len(y_train_shapes) if isinstance(y_train_shapes[0], (list, tuple)) else 1
             }
         except Exception as e:
             print(f"Error analyzing model: {e}")
@@ -102,6 +122,7 @@ class SimplePHMAnalyzer:
         batch_size = model_info["batch_size"]
         input_features = model_info["input_features"]
         batches_per_epoch = model_info["batches_per_epoch"]
+        num_outputs = model_info["num_outputs"]
         
         # Base time factor (GPU vs CPU)
         if self.gpu_available:
@@ -120,9 +141,12 @@ class SimplePHMAnalyzer:
         # Number of batches impact
         batch_count_factor = batches_per_epoch / 100  # baseline 100 batches per epoch
         
+        # Multiple outputs impact
+        output_factor = max(1.0, num_outputs * 0.3 + 0.7)  # each additional output adds complexity
+        
         # Calculate time per epoch
         time_per_epoch = (base_time_per_million_params * model_params_m * 
-                         batch_factor * feature_factor * batch_count_factor * device_factor)
+                         batch_factor * feature_factor * batch_count_factor * device_factor * output_factor)
         
         return max(0.05, time_per_epoch)  # minimum 0.05 minutes (3 seconds)
     
@@ -132,6 +156,7 @@ class SimplePHMAnalyzer:
         batch_size = model_info["batch_size"]
         input_features = model_info["input_features"]
         output_features = model_info["output_features"]
+        num_outputs = model_info["num_outputs"]
         
         # Model parameter memory (float32: 4 bytes/parameter)
         model_memory = model_params_m * 4 / 1000  # MB to GB
@@ -139,7 +164,7 @@ class SimplePHMAnalyzer:
         # Gradient memory (same as model parameters)
         gradient_memory = model_memory
         
-        # Data batch memory (input + output) for 3D data
+        # Data batch memory (input + all outputs)
         data_memory = batch_size * (input_features + output_features) * 4 / (1024**3)
         
         # Optimizer state memory (Adam: approximately 2x model parameters)
@@ -148,8 +173,11 @@ class SimplePHMAnalyzer:
         # Intermediate activations (depends on model depth and batch size)
         activation_memory = batch_size * input_features * 4 / (1024**3) * 2  # estimated
         
+        # Multiple output overhead
+        multi_output_overhead = num_outputs * 0.1 if num_outputs > 1 else 0
+        
         # Other overhead (TensorFlow/Keras overhead, cache, etc.)
-        overhead_memory = model_memory * 0.8
+        overhead_memory = model_memory * 0.8 + multi_output_overhead
         
         total_memory = (model_memory + gradient_memory + data_memory + 
                        optimizer_memory + activation_memory + overhead_memory)
@@ -216,7 +244,7 @@ class SimplePHMAnalyzer:
             "available_memory_gb": memory_info.available / (1024**3)
         }
     
-    def analyze_existing_model(self, model, X_train_shape, y_train_shape, batch_size):
+    def analyze_existing_model(self, model, X_train_shape, y_train_shapes, batch_size):
         """Complete analysis for existing Keras model"""
         print("PHM Model Training Resource Analysis")
         print("=" * 50)
@@ -233,7 +261,7 @@ class SimplePHMAnalyzer:
         print("-" * 50)
         
         # Analyze model
-        model_info = self.analyze_keras_model(model, X_train_shape, y_train_shape, batch_size)
+        model_info = self.analyze_keras_model(model, X_train_shape, y_train_shapes, batch_size)
         if model_info is None:
             print("Failed to analyze model!")
             return
@@ -252,7 +280,8 @@ class SimplePHMAnalyzer:
         print(f"  • Total Parameters: {model_info['total_params']:,} ({model_info['model_params_m']:.2f}M)")
         print(f"  • Trainable Parameters: {model_info['trainable_params']:,}")
         print(f"  • Input Shape: {X_train_shape}")
-        print(f"  • Output Shape: {y_train_shape}")
+        print(f"  • Output Shapes: {y_train_shapes}")
+        print(f"  • Number of Outputs: {model_info['num_outputs']}")
         print(f"  • Training Samples: {model_info['samples']:,}")
         print(f"  • Batch Size: {batch_size}")
         print(f"  • Batches per Epoch: {model_info['batches_per_epoch']}")
@@ -310,18 +339,27 @@ class SimplePHMAnalyzer:
         }
 
 # Create function to analyze user's existing model
-def analyze_phm_model(model, X_train_rul_shape, y_rul_train_rul_shape, batch_size):
+def analyze_phm_model(model, X_train_shape, y_train_shapes, batch_size):
     """
     Analyze your existing PHM model for training resource requirements
     
     Parameters:
-    - model: Your compiled Keras model (model_prognostic)
-    - X_train_rul_shape: Shape tuple of your training data, e.g., (9635, 32, 21)
-    - y_rul_train_rul_shape: Shape tuple of your labels, e.g., (9635,)
+    - model: Your compiled Keras model (e.g., model_prognostic)
+    - X_train_shape: Shape tuple of your training data, e.g., (9635, 21) for 2D or (9635, 32, 21) for 3D
+    - y_train_shapes: Shape tuple(s) of your labels:
+        * For single output: (9635,) or (9635, 10)
+        * For multiple outputs: [(9635, 128), (9635, 21)] - list of tuples for each output
     - batch_size: Your chosen batch size for training
+    
+    Example usage:
+    # Single output model
+    analyze_phm_model(model_prognostic, (9635, 21), (9635,), 64)
+    
+    # Multiple output model
+    analyze_phm_model(model_prognostic, (9635, 21), [(9635, 128), (9635, 21)], 64)
     """
     analyzer = SimplePHMAnalyzer()
-    return analyzer.analyze_existing_model(model, X_train_rul_shape, y_rul_train_rul_shape, batch_size)
+    return analyzer.analyze_existing_model(model, X_train_shape, y_train_shapes, batch_size)
 
 # Function to monitor training in real-time
 def monitor_training_progress(analyzer, model_info, epoch_num, epoch_start_time):
@@ -340,16 +378,27 @@ def example_usage():
     """
     Example of how to use the analyzer with your model:
     
-    # After defining your model (model_prognostic) and data shapes
-    X_train_rul_shape = (9635, 32, 21)  # Your actual data shape
-    y_rul_train_rul_shape = (9635,)     # Your actual label shape
-    batch_size = 64                      # Your chosen batch size
+    # Single output example
+    X_train_shape = (9635, 21)      # Your actual training data shape
+    y_train_shape = (9635,)         # Your actual label shape (single output)
+    batch_size = 64                 # Your chosen batch size
     
-    # Analyze your model
     analysis_results = analyze_phm_model(
-        model_prognostic, 
-        X_train_rul_shape, 
-        y_rul_train_rul_shape, 
+        model_prognostic,           # Your trained model
+        X_train_shape, 
+        y_train_shape, 
+        batch_size
+    )
+    
+    # Multiple output example (based on your model with 2 outputs)
+    X_train_shape = (9635, 21)                    # Input shape
+    y_train_shapes = [(9635, 128), (9635, 21)]    # Two outputs: encoded_out1 and encoded_out2
+    batch_size = 64
+    
+    analysis_results = analyze_phm_model(
+        model_prognostic,
+        X_train_shape,
+        y_train_shapes,
         batch_size
     )
     
@@ -366,6 +415,9 @@ print("Simplified PHM Model Training Resource Analyzer")
 print("=" * 50)
 print("Ready to analyze your Keras model!")
 print("\nUsage:")
-print("  analyze_phm_model(your_model, X_train_shape, y_train_shape, batch_size)")
-print("\nExample:")
-print("  analyze_phm_model(model_prognostic, (9635, 32, 21), (9635,), 64)")
+print("  analyze_phm_model(your_model, X_train_shape, y_train_shapes, batch_size)")
+print("\nExamples:")
+print("  # Single output:")
+print("  analyze_phm_model(model_prognostic, (9635, 21), (9635,), 64)")
+print("  # Multiple outputs:")
+print("  analyze_phm_model(model_prognostic, (9635, 21), [(9635, 128), (9635, 21)], 64)")
