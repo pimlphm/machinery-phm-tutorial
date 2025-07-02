@@ -38,7 +38,24 @@ def load_turbofan_data(extract_path="turbofan_data"):
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_path)
         
-        # Clean up zip file
+        # Extract the inner CMAPSSData.zip if it exists
+        inner_zip_path = None
+        for root, _, files in os.walk(extract_path):
+            for file in files:
+                if file.lower() == "cmapssdata.zip":
+                    inner_zip_path = os.path.join(root, file)
+                    break
+            if inner_zip_path:
+                break
+                
+        if inner_zip_path:
+            print("Extracting inner CMAPSSData.zip...")
+            with zipfile.ZipFile(inner_zip_path, 'r') as inner_zip_ref:
+                inner_zip_ref.extractall(extract_path)
+            # Remove the inner zip file
+            os.remove(inner_zip_path)
+        
+        # Clean up outer zip file
         if os.path.exists(zip_path):
             os.remove(zip_path)
         print(f"Dataset downloaded and extracted to: {extract_path}")
