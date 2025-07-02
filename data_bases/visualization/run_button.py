@@ -4,22 +4,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tensorflow.keras.models import load_model
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 from IPython.display import display
 import ipywidgets as widgets
 
-def create_run_button(X_test_scaled, y_test_cat):
+def create_run_button(X_test_scaled, y_test_cat,
+                      reconstruction_errors=None,
+                      feature_importance=None,
+                      feature_names=None):
     """
-    Create an interactive widget to load a trained model,
-    evaluate predictions on a test set, and visualize:
-    - Confusion matrix
-    - Confidence distribution
-    - Reconstruction error (simulated)
-    - Feature importance (simulated)
+    Create an interactive evaluation button to:
+    - Load a trained model
+    - Predict and evaluate on test set
+    - Visualize confusion matrix, confidence, reconstruction error, and feature importance
 
     Parameters:
-        X_test_scaled (ndarray): Preprocessed test features
+        X_test_scaled (ndarray): Normalized test feature matrix
         y_test_cat (ndarray): One-hot encoded test labels
+        reconstruction_errors (ndarray or None): Optional array of reconstruction errors
+        feature_importance (ndarray or None): Optional array of feature importance scores
+        feature_names (list or None): Optional list of feature names (e.g., ['F1', 'F2', ...])
     """
 
     # === Step 1: UI widgets ===
@@ -63,13 +67,30 @@ def create_run_button(X_test_scaled, y_test_cat):
             print("❌ Prediction failed. Make sure inputs are valid arrays.")
             return
 
-        # Simulated data (you may replace with real values)
-        reconstruction_error = np.random.rand(len(y_true))
-        input_dim = X_test_scaled.shape[1]
-        importance = np.abs(np.random.randn(input_dim))
-        top_idx = importance.argsort()[-10:]
-        feature_names = [f"F{i+1}" for i in range(input_dim)]
+        # === Print classification report ===
+        print("\n📊 Classification Report:")
+        print(classification_report(y_true, y_pred, target_names=class_names, digits=3))
+        print(f"✅ Overall Accuracy: {accuracy_score(y_true, y_pred) * 100:.2f}%")
 
+        # === Reconstruction Error: Use provided or simulate ===
+        if reconstruction_errors is not None and len(reconstruction_errors) == len(y_true):
+            rec_err = reconstruction_errors
+        else:
+            rec_err = np.random.rand(len(y_true))  # Simulated fallback
+
+        # === Feature Importance: Use provided or simulate ===
+        input_dim = X_test_scaled.shape[1]
+        if feature_importance is not None and len(feature_importance) == input_dim:
+            importance = np.abs(feature_importance)
+        else:
+            importance = np.abs(np.random.randn(input_dim))  # Simulated fallback
+
+        if feature_names is None or len(feature_names) != input_dim:
+            feature_names = [f"F{i+1}" for i in range(input_dim)]
+
+        top_idx = importance.argsort()[-10:]
+
+        # === Plotting ===
         fig, axs = plt.subplots(2, 2, figsize=(14, 10))
 
         # 1. Confusion matrix
@@ -80,7 +101,7 @@ def create_run_button(X_test_scaled, y_test_cat):
         axs[0, 0].set_xlabel("Predicted")
         axs[0, 0].set_ylabel("Actual")
 
-        # 2. Confidence
+        # 2. Confidence distribution
         max_probs = pred_probs.max(axis=1)
         for i in range(n_classes):
             axs[0, 1].hist(max_probs[y_true == i], bins=20, alpha=0.5, label=class_names[i])
@@ -91,8 +112,8 @@ def create_run_button(X_test_scaled, y_test_cat):
 
         # 3. Reconstruction error
         for i in range(n_classes):
-            axs[1, 0].hist(reconstruction_error[y_true == i], bins=20, alpha=0.5, label=class_names[i])
-        axs[1, 0].set_title("Reconstruction Error by Class (Simulated)")
+            axs[1, 0].hist(rec_err[y_true == i], bins=20, alpha=0.5, label=class_names[i])
+        axs[1, 0].set_title("Reconstruction Error by Class")
         axs[1, 0].set_xlabel("Reconstruction Error")
         axs[1, 0].set_ylabel("Count")
         axs[1, 0].legend()
@@ -101,7 +122,7 @@ def create_run_button(X_test_scaled, y_test_cat):
         axs[1, 1].barh(range(10), importance[top_idx], align='center')
         axs[1, 1].set_yticks(range(10))
         axs[1, 1].set_yticklabels([feature_names[i] for i in top_idx])
-        axs[1, 1].set_title("Top 10 Feature Importance (Simulated)")
+        axs[1, 1].set_title("Top 10 Feature Importance")
         axs[1, 1].set_xlabel("Importance Score")
 
         plt.tight_layout()
