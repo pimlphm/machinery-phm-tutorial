@@ -17,6 +17,7 @@ def create_run_button(X_test_scaled, y_test_cat):
     - Classification confidence
     - SHAP feature importance
     - Reconstruction error (via encoder-decoder structure)
+    - Evaluation metrics via model.evaluate() and sklearn report
 
     Assumptions:
     - The trained model includes an 'embedding' layer (encoder bottleneck)
@@ -64,10 +65,16 @@ def create_run_button(X_test_scaled, y_test_cat):
             print(f"❌ Prediction failed: {e}")
             return
 
-        # === Evaluation Metrics ===
-        print("\n📊 Classification Report:")
+        # === Built-in Keras metrics ===
+        print("\n📉 Evaluating model with model.evaluate():")
+        results = model.evaluate(X_test_scaled, y_test_cat, verbose=0)
+        for name, value in zip(model.metrics_names, results):
+            print(f"{name}: {value:.4f}")
+
+        # === Additional sklearn metrics ===
+        print("\n📊 Classification Report (sklearn):")
         print(classification_report(y_true, y_pred, target_names=class_names, digits=3))
-        print(f"✅ Overall Accuracy: {accuracy_score(y_true, y_pred) * 100:.2f}%")
+        print(f"✅ Accuracy (from sklearn): {accuracy_score(y_true, y_pred) * 100:.2f}%")
 
         # === SHAP Feature Importance ===
         try:
@@ -75,20 +82,18 @@ def create_run_button(X_test_scaled, y_test_cat):
             background = X_test_scaled[np.random.choice(X_test_scaled.shape[0], 100, replace=False)]
             explainer = shap.DeepExplainer(model, background)
             shap_values = explainer.shap_values(X_test_scaled)
-            # Average SHAP magnitude over classes and samples
             shap_mean = np.mean(np.abs(np.array(shap_values)), axis=(0, 1))
         except Exception as e:
             print(f"⚠️ SHAP computation failed, using simulated importance: {e}")
             shap_mean = np.abs(np.random.randn(X_test_scaled.shape[1]))
 
-        # === Reconstruction Error (if encoder + decoder present) ===
+        # === Reconstruction Error (via encoder-decoder) ===
         try:
             print("\n🔧 Attempting reconstruction from encoder-decoder...")
-            # Extract encoder from the embedding layer
             encoder = Model(inputs=model.input, outputs=model.get_layer('embedding').output)
             encoded = encoder.predict(X_test_scaled)
 
-            # Attempt to build decoder dynamically (layer-by-layer after embedding)
+            # Auto build decoder (reuse post-embedding layers)
             decoding_input = tf.keras.Input(shape=(encoded.shape[1],))
             x = decoding_input
             collect = False
@@ -100,13 +105,13 @@ def create_run_button(X_test_scaled, y_test_cat):
             decoder = Model(inputs=decoding_input, outputs=x)
             reconstructed = decoder.predict(encoded)
 
-            # Mean squared error per sample
+            # Compute mean squared error per sample
             reconstruction_errors = np.mean((X_test_scaled - reconstructed)**2, axis=1)
         except Exception as e:
             print(f"⚠️ Reconstruction failed, using simulated errors: {e}")
             reconstruction_errors = np.random.rand(len(y_true))
 
-        # === Visualization ===
+        # === Plotting ===
         input_dim = X_test_scaled.shape[1]
         feature_names = [f"F{i+1}" for i in range(input_dim)]
         top_idx = shap_mean.argsort()[-10:]
