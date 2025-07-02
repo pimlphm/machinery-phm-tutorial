@@ -19,7 +19,8 @@ def load_turbofan_data(extract_path="turbofan_data"):
     os.makedirs(extract_path, exist_ok=True)
     zip_path = os.path.join(extract_path, "CMAPSS.zip")
 
-    if not os.path.exists(os.path.join(extract_path, "CMAPSSData")):
+    # Only extract if files not already present
+    if not any("train_FD001.txt" in f for _, _, fs in os.walk(extract_path) for f in fs):
         print("Downloading C-MAPSS dataset...")
         response = requests.get(GITHUB_URL)
         with open(zip_path, 'wb') as f:
@@ -43,7 +44,7 @@ def load_turbofan_data(extract_path="turbofan_data"):
     for fd in ['001', '002', '003', '004']:
         prefix = f'FD{fd}'
 
-        # 自动查找文件路径
+        # 自动递归查找文件路径
         train_file = test_file = rul_file = None
         for root, _, files in os.walk(extract_path):
             for fname in files:
