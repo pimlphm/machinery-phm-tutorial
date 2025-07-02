@@ -45,13 +45,13 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     acc = accuracy_score(y_true, y_pred) * 100
     print(f"✅ Overall Accuracy: {acc:.2f}%")
 
-    # SHAP
+    # SHAP - Use different explainer to avoid LeakyRelu error
     try:
         print("\n🔍 Computing SHAP feature importance...")
-        # Use DeepExplainer instead of GradientExplainer to avoid LeakyRelu error
-        background = X_test_scaled[np.random.choice(len(X_test_scaled), 100, replace=False)]
-        explainer = shap.DeepExplainer(model, background)
-        shap_values = explainer.shap_values(X_test_scaled[:200])  # Limit sample size
+        # Use KernelExplainer instead of DeepExplainer to avoid gradient issues
+        background = X_test_scaled[np.random.choice(len(X_test_scaled), 50, replace=False)]
+        explainer = shap.KernelExplainer(lambda x: model.predict(x), background)
+        shap_values = explainer.shap_values(X_test_scaled[:50])  # Further limit sample size
         if isinstance(shap_values, list):
             # For multi-class models
             shap_mean = np.mean([np.abs(sv) for sv in shap_values], axis=(0, 1))
@@ -62,58 +62,37 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
         print(f"⚠️ SHAP failed: {e}")
         shap_mean = np.abs(np.random.randn(X_test_scaled.shape[1]))
 
-    # Reconstruction Error
+    # Reconstruction Error - Simplified approach
     try:
         print("\n🔧 Computing reconstruction error...")
         # Check if model has an embedding layer
         has_embedding = any(layer.name == 'embedding' for layer in model.layers)
         
         if has_embedding:
+            # Create encoder to get embedding
             encoder = Model(inputs=model.input, outputs=model.get_layer('embedding').output)
             encoded = encoder.predict(X_test_scaled)
             
-            # Create decoder more carefully
-            dec_in = tf.keras.Input(shape=(encoded.shape[1],))
-            x = dec_in
-            collect = False
-            for lyr in model.layers:
-                if collect:
-                    try:
-                        x = lyr(x)
-                    except:
-                        pass  # Skip layers that can't be applied
-                if lyr.name == 'embedding':
-                    collect = True
-            
-            decoder = Model(dec_in, x)
-            recon = decoder.predict(encoded)
-            
-            # Check shapes before computing error
-            if recon.shape == X_test_scaled.shape:
-                recon_err = np.mean((X_test_scaled - recon) ** 2, axis=1)
-            else:
-                print(f"⚠️ Shape mismatch: X_test_scaled {X_test_scaled.shape}, recon {recon.shape}")
-                # Instead of random values, use class-based dummy values for visualization
-                recon_err = np.zeros(len(y_true))
-                for i in range(len(class_names)):
-                    # Assign different error ranges to different classes for visualization
-                    recon_err[y_true == i] = 0.1 * (i + 1) + 0.05 * np.random.rand(np.sum(y_true == i))
+            # For autoencoder-style models, use the embedding as compressed representation
+            # and compute error based on how well the model can reconstruct from it
+            # Since we can't easily build a decoder, use prediction confidence as proxy
+            max_confidence = np.max(pred_probs, axis=1)
+            # Invert confidence to get "error" (low confidence = high error)
+            recon_err = 1.0 - max_confidence
         else:
-            print("⚠️ No embedding layer found")
-            # Use class-based dummy values instead of random
-            recon_err = np.zeros(len(y_true))
-            for i in range(len(class_names)):
-                recon_err[y_true == i] = 0.1 * (i + 1) + 0.05 * np.random.rand(np.sum(y_true == i))
+            print("⚠️ No embedding layer found, using prediction confidence as proxy")
+            # Use prediction confidence as reconstruction error proxy
+            max_confidence = np.max(pred_probs, axis=1)
+            recon_err = 1.0 - max_confidence
     except Exception as e:
-        print(f"⚠️ Reconstruction failed: {e}")
-        # Use class-based dummy values instead of random
-        recon_err = np.zeros(len(y_true))
-        for i in range(len(class_names)):
-            recon_err[y_true == i] = 0.1 * (i + 1) + 0.05 * np.random.rand(np.sum(y_true == i))
+        print(f"⚠️ Reconstruction computation failed: {e}")
+        # Use prediction confidence as fallback
+        max_confidence = np.max(pred_probs, axis=1)
+        recon_err = 1.0 - max_confidence
 
     # Visualization
     fnames = [f"F{i+1}" for i in range(X_test_scaled.shape[1])]
-    top10 = shap_mean.argsort()[-10:]
+    top10_indices = shap_mean.argsort()[-10:] if len(shap_mean) >= 10 else shap_mean.argsort()
     fig, axs = plt.subplots(2, 2, figsize=(14, 10))
 
     # Confusion Matrix
@@ -125,21 +104,26 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     # Classification Confidence
     max_probs = pred_probs.max(axis=1)
     for i in range(len(class_names)):
-        axs[0,1].hist(max_probs[y_true == i], bins=20, alpha=0.5, label=class_names[i])
+        mask = y_true == i
+        if np.any(mask):
+            axs[0,1].hist(max_probs[mask], bins=20, alpha=0.5, label=class_names[i])
     axs[0,1].set(title="Classification Confidence", xlabel="Max Prob", ylabel="Count")
     axs[0,1].legend()
 
-    # Reconstruction Error
+    # Reconstruction Error (now using confidence proxy)
     for i in range(len(class_names)):
-        axs[1,0].hist(recon_err[y_true == i], bins=20, alpha=0.5, label=class_names[i])
-    axs[1,0].set(title="Reconstruction Error", xlabel="MSE", ylabel="Count")
+        mask = y_true == i
+        if np.any(mask):
+            axs[1,0].hist(recon_err[mask], bins=20, alpha=0.5, label=class_names[i])
+    axs[1,0].set(title="Reconstruction Error (1 - Confidence)", xlabel="Error", ylabel="Count")
     axs[1,0].legend()
 
     # SHAP Bar Plot
-    axs[1,1].barh(range(10), shap_mean[top10], align='center')
-    axs[1,1].set_yticks(range(10))
-    axs[1,1].set_yticklabels([fnames[i] for i in top10])
-    axs[1,1].set(title="Top 10 SHAP Importance", xlabel="Mean |Impact|")
+    n_features = min(10, len(top10_indices))
+    axs[1,1].barh(range(n_features), shap_mean[top10_indices][:n_features], align='center')
+    axs[1,1].set_yticks(range(n_features))
+    axs[1,1].set_yticklabels([fnames[i] for i in top10_indices[:n_features]])
+    axs[1,1].set(title=f"Top {n_features} SHAP Importance", xlabel="Mean |Impact|")
 
     plt.tight_layout()
     plt.show()
