@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from mpl_toolkits.mplot3d import Axes3D
-
+ 
 def visualize_features_pca(
     X: np.ndarray,
     y: np.ndarray,
