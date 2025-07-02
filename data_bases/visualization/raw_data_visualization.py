@@ -78,48 +78,51 @@ def load_and_preprocess(subset):
     return df
 
 # === Simple visualization ===
-def create_sensor_plot(df, sensor_names, unit_numbers):
-    """Create simple sensor visualization"""
+def create_sensor_plot(df, sensor_names, unit_numbers, plot_output):
+    """Create simple sensor visualization in the plot output widget"""
     
     n_sensors = len(sensor_names)
     n_cols = min(3, n_sensors)
     n_rows = (n_sensors + n_cols - 1) // n_cols
     
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 4*n_rows))
-    
-    if n_sensors == 1:
-        axes = [axes]
-    elif n_rows == 1:
-        axes = [axes]
-    else:
-        axes = axes.flatten()
-    
-    fig.suptitle(f'Sensor Data Visualization', fontsize=16)
-    
-    colors = plt.cm.Set1(np.linspace(0, 1, len(unit_numbers)))
-    
-    for i, sensor in enumerate(sensor_names):
-        ax = axes[i] if n_sensors > 1 else axes[0]
+    with plot_output:
+        clear_output(wait=True)
         
-        for j, unit in enumerate(unit_numbers):
-            unit_data = df[df['unit_number'] == unit]
-            color = colors[j]
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 4*n_rows))
+        
+        if n_sensors == 1:
+            axes = [axes]
+        elif n_rows == 1:
+            axes = [axes]
+        else:
+            axes = axes.flatten()
+        
+        fig.suptitle(f'Sensor Data Visualization', fontsize=16)
+        
+        colors = plt.cm.Set1(np.linspace(0, 1, len(unit_numbers)))
+        
+        for i, sensor in enumerate(sensor_names):
+            ax = axes[i] if n_sensors > 1 else axes[0]
             
-            ax.plot(unit_data['time_in_cycles'], unit_data[sensor], 
-                   color=color, label=f'Unit {unit}', linewidth=1.5, alpha=0.8)
+            for j, unit in enumerate(unit_numbers):
+                unit_data = df[df['unit_number'] == unit]
+                color = colors[j]
+                
+                ax.plot(unit_data['time_in_cycles'], unit_data[sensor], 
+                       color=color, label=f'Unit {unit}', linewidth=1.5, alpha=0.8)
+            
+            ax.set_title(f'{sensor} Time Series')
+            ax.set_xlabel('Time in Cycles')
+            ax.set_ylabel(sensor)
+            ax.legend()
+            ax.grid(True, alpha=0.3)
         
-        ax.set_title(f'{sensor} Time Series')
-        ax.set_xlabel('Time in Cycles')
-        ax.set_ylabel(sensor)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-    
-    # Hide unused subplots
-    for i in range(n_sensors, len(axes)):
-        axes[i].set_visible(False)
-    
-    plt.tight_layout()
-    plt.show()
+        # Hide unused subplots
+        for i in range(n_sensors, len(axes)):
+            axes[i].set_visible(False)
+        
+        plt.tight_layout()
+        plt.show()
 
 # === Simple Configuration Widget ===
 def create_simple_config_widget():
@@ -199,52 +202,66 @@ def create_simple_config_widget():
                 print(f"❌ Error loading data: {str(e)}")
     
     def on_plot_data_clicked(b):
-        with plot_output:
-            clear_output(wait=True)
-            if global_df is None:
+        if global_df is None:
+            with output_area:
+                clear_output(wait=True)
                 print("❌ Please load data first!")
-                return
-            
-            if len(unit_selector.value) == 0:
+            return
+        
+        if len(unit_selector.value) == 0:
+            with output_area:
+                clear_output(wait=True)
                 print("❌ Please select at least one unit!")
-                return
-            
-            if len(sensor_selector.value) == 0:
+            return
+        
+        if len(sensor_selector.value) == 0:
+            with output_area:
+                clear_output(wait=True)
                 print("❌ Please select at least one sensor!")
-                return
+            return
+        
+        try:
+            selected_units = list(unit_selector.value)
+            selected_sensors = list(sensor_selector.value)
             
-            try:
-                selected_units = list(unit_selector.value)
-                selected_sensors = list(sensor_selector.value)
-                
+            with output_area:
+                clear_output(wait=True)
                 print("🚀 Generating plot...")
-                create_sensor_plot(global_df, selected_sensors, selected_units)
-                    
-            except Exception as e:
+            
+            create_sensor_plot(global_df, selected_sensors, selected_units, plot_output)
+                
+        except Exception as e:
+            with output_area:
+                clear_output(wait=True)
                 print(f"❌ Error plotting data: {str(e)}")
     
     # Connect event handlers
     load_data_btn.on_click(on_load_data_clicked)
     plot_data_btn.on_click(on_plot_data_clicked)
     
-    # Layout
-    config_box = widgets.VBox([
+    # Left side control panel
+    control_panel = widgets.VBox([
         widgets.HTML("<h3>📊 CMAPSS Data Visualization</h3>"),
-        widgets.HBox([
-            widgets.VBox([
-                subset_selector,
-                widgets.HBox([load_data_btn, plot_data_btn])
-            ]),
-            widgets.VBox([
-                sensor_selector,
-                unit_selector
-            ])
-        ]),
-        output_area,
+        subset_selector,
+        widgets.HBox([load_data_btn, plot_data_btn]),
+        sensor_selector,
+        unit_selector,
+        output_area
+    ], layout=widgets.Layout(width='400px', padding='10px'))
+    
+    # Right side plot area
+    plot_panel = widgets.VBox([
+        widgets.HTML("<h3>📈 Visualization Area</h3>"),
         plot_output
+    ], layout=widgets.Layout(width='800px', padding='10px'))
+    
+    # Main layout - left controls, right plots
+    main_layout = widgets.HBox([
+        control_panel,
+        plot_panel
     ])
     
-    return config_box
+    return main_layout
 
 # === Main function ===
 def raw_data_visualization():
