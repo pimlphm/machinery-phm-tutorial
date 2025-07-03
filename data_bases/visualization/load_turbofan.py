@@ -338,8 +338,9 @@ def load_turbofan_data(extract_path="turbofan_data"):
     # for i, (setting, desc) in enumerate(setting_descriptions.items(), 3):
     #     print(f"      {i}. {setting}: {desc}")
     print("  6-26. sensor_1 to sensor_21 - 21 sensor measurements:")
-    for i, (sensor, desc) in enumerate(sensor_descriptions.items(), 6):
-        print(f"      {i}. {sensor}: {desc}")
+    print(sensor_descriptions)
+    # for i, (sensor, desc) in enumerate(sensor_descriptions.items(), 6):
+    #     print(f"      {i}. {sensor}: {desc}")
     print("  27. RUL - Remaining Useful Life (target variable)")
     print("\nTest data dimensions (26):")
     print("  1. engine_id - Engine identifier")
