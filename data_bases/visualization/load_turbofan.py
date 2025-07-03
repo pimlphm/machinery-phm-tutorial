@@ -160,4 +160,20 @@ def load_turbofan_data(extract_path="turbofan_data"):
             for f in files:
                 print(f"  {os.path.join(root, f)}")
     
-    return datasets
+    # Extract data as numpy arrays
+    train_data = {}
+    test_data = {}
+    train_rul = {}
+    test_rul = {}
+
+    for fd_key in datasets.keys():
+        train_data[fd_key] = datasets[fd_key]['train_data'].values
+        test_data[fd_key] = datasets[fd_key]['test_data'].values
+        train_rul[fd_key] = datasets[fd_key]['train_rul'].values
+        test_rul[fd_key] = datasets[fd_key]['test_rul'].values
+
+    print("Data extraction completed:")
+    for fd_key in datasets.keys():
+        print(f"{fd_key}: Train data shape: {train_data[fd_key].shape}, Test data shape: {test_data[fd_key].shape}")
+    
+    return train_data,test_data,train_rul,test_rul
