@@ -20,6 +20,42 @@ def interactive_layer_pca_visualization(model_path, X_test_scaled, y_test):
     # Load the model from the provided path
     model = load_model(model_path)
     
+    def visualize_features_pca(features, labels, n_components=2, label_names=None, colors=None, title="PCA Visualization"):
+        """
+        Helper function to visualize PCA results
+        """
+        # Flatten features if needed
+        if len(features.shape) > 2:
+            features = features.reshape(features.shape[0], -1)
+        
+        # Standardize features
+        scaler = StandardScaler()
+        features_scaled = scaler.fit_transform(features)
+        
+        # Apply PCA
+        pca = PCA(n_components=n_components)
+        features_pca = pca.fit_transform(features_scaled)
+        
+        # Create scatter plot
+        plt.figure(figsize=(10, 8))
+        
+        unique_labels = np.unique(labels)
+        if colors is None:
+            colors = plt.cm.tab10(np.linspace(0, 1, len(unique_labels)))
+        if label_names is None:
+            label_names = [f'Class {i}' for i in unique_labels]
+        
+        for i, label in enumerate(unique_labels):
+            mask = labels == label
+            plt.scatter(features_pca[mask, 0], features_pca[mask, 1], 
+                       c=colors[i], label=label_names[i], alpha=0.7, s=50)
+        
+        plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.2%} variance)')
+        plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.2%} variance)')
+        plt.title(title)
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+    
     def update_pca_plot(layer_index):
         # Clear previous plot
         plt.clf()
