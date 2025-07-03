@@ -36,7 +36,12 @@ def plot_rul_degradation_3d(train_data):
                 line=dict(color=colors[subset_key], width=3),
                 name=subset_key,
                 showlegend=bool(unit_id == unit_ids[0]),  # Convert numpy bool to Python bool
-                legendgroup=subset_key
+                legendgroup=subset_key,
+                hovertemplate='<b>%{fullData.name}</b><br>' +
+                              'Operation Cycles: %{x}<br>' +
+                              'Engine ID: %{y}<br>' +
+                              'Remaining Useful Life: %{z}<br>' +
+                              '<extra></extra>'
             ))
 
     # === Beautify ===
