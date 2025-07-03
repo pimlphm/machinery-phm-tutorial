@@ -314,7 +314,7 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
 
     # === Enhanced debugging and statistics ===
     batch = next(iter(train_loader))
-    print("✅ Enhanced DataLoader batch shapes:")
+    # print("✅ Enhanced DataLoader batch shapes:")
     print("x:", batch['x'].shape)
     print("rul:", batch['rul'].shape)
     print("rul_original:", batch['rul_original'].shape)
@@ -322,24 +322,24 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
     if 'seg_label' in batch:
         print("seg_label:", batch['seg_label'].shape)
     
-    print(f"\n🎯 Configuration Summary:")
+    # print(f"\n🎯 Configuration Summary:")
     print(f"Selected sensors: {selected_sensors}")
     print(f"Number of sensor channels: {len(selected_sensors)}")
-    print(f"Enhanced features: diff={add_diff_features}, pos_enc={add_position_encoding}")
-    print(f"Data augmentation: boundary={boundary_oversample}, exp_samp={exponential_sampling}, noise={noise_augmentation}")
-    print(f"RUL transformation: {rul_transform}")
-    print(f"Standardization clipping: ±{clip_std_range}")
+    # print(f"Enhanced features: diff={add_diff_features}, pos_enc={add_position_encoding}")
+    # print(f"Data augmentation: boundary={boundary_oversample}, exp_samp={exponential_sampling}, noise={noise_augmentation}")
+    # print(f"RUL transformation: {rul_transform}")
+    # print(f"Standardization clipping: ±{clip_std_range}")
     
-    print(f"\n📊 Dataset Statistics:")
-    print(f"Original shapes - Train: {orig_stats['X_train_shape']}, Test: {orig_stats['X_test_shape']}")
-    print(f"Final shapes - Train: {X_train.shape}, Test: {X_test.shape}")
-    print(f"Total batches - Train: {len(train_loader)}, Val: {len(val_loader)}, Test: {len(test_loader)}")
+    # print(f"\n📊 Dataset Statistics:")
+    # print(f"Original shapes - Train: {orig_stats['X_train_shape']}, Test: {orig_stats['X_test_shape']}")
+    # print(f"Final shapes - Train: {X_train.shape}, Test: {X_test.shape}")
+    # print(f"Total batches - Train: {len(train_loader)}, Val: {len(val_loader)}, Test: {len(test_loader)}")
     
-    print(f"\n📈 Data Ranges After Preprocessing:")
-    print(f"X_train: min={X_train.min():.3f}, max={X_train.max():.3f}, std={X_train.std():.3f}")
-    print(f"X_test: min={X_test.min():.3f}, max={X_test.max():.3f}, std={X_test.std():.3f}")
-    print(f"y_train: min={y_train.min():.1f}, max={y_train.max():.1f}, mean={y_train.mean():.1f}")
-    print(f"y_test: min={y_test.min():.1f}, max={y_test.max():.1f}, mean={y_test.mean():.1f}")
+    # print(f"\n📈 Data Ranges After Preprocessing:")
+    # print(f"X_train: min={X_train.min():.3f}, max={X_train.max():.3f}, std={X_train.std():.3f}")
+    # print(f"X_test: min={X_test.min():.3f}, max={X_test.max():.3f}, std={X_test.std():.3f}")
+    # print(f"y_train: min={y_train.min():.1f}, max={y_train.max():.1f}, mean={y_train.mean():.1f}")
+    # print(f"y_test: min={y_test.min():.1f}, max={y_test.max():.1f}, mean={y_test.mean():.1f}")
 
     # Enhanced return with additional metadata
     return_dict = {
