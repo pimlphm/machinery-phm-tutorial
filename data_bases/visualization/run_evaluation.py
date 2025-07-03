@@ -45,13 +45,13 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     acc = accuracy_score(y_true, y_pred) * 100
     print(f"✅ Overall Accuracy: {acc:.2f}%")
 
-    # SHAP - Use different explainer to avoid LeakyRelu error
+    # SHAP - Use very small sample for speed
     try:
         print("\n🔍 Computing SHAP feature importance...")
-        # Use KernelExplainer instead of DeepExplainer to avoid gradient issues
-        background = X_test_scaled[np.random.choice(len(X_test_scaled), 50, replace=False)]
+        # Use much smaller samples for speed
+        background = X_test_scaled[np.random.choice(len(X_test_scaled), 10, replace=False)]
         explainer = shap.KernelExplainer(lambda x: model.predict(x), background)
-        shap_values = explainer.shap_values(X_test_scaled[:50])  # Further limit sample size
+        shap_values = explainer.shap_values(X_test_scaled[:5])  # Only 5 samples
         if isinstance(shap_values, list):
             # For multi-class models
             shap_mean = np.mean([np.abs(sv) for sv in shap_values], axis=(0, 1))
@@ -127,5 +127,3 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
 
     plt.tight_layout()
     plt.show()
-
-    y_test_cat=y_test_cat,
