@@ -7,15 +7,18 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def interactive_layer_pca_visualization(model, X_test_scaled, y_test):
+def interactive_layer_pca_visualization(model_path, X_test_scaled, y_test):
     """
     Create an interactive slider to visualize PCA results from different layers of the model
     
     Args:
-        model: The trained diagnostic model
+        model_path: Path to the trained diagnostic model file
         X_test_scaled: Scaled test data
         y_test: Test labels
     """
+    
+    # Load the model from the provided path
+    model = load_model(model_path)
     
     def update_pca_plot(layer_index):
         # Clear previous plot
