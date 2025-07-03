@@ -7,9 +7,14 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 
 # === (1): Slice engine data into sliding windows ===
-def create_windows(data, window=32, stride=16):
+def create_windows(data, window=32, stride=16, selected_sensors=None):
     X, y = [], []
     sensors = [f'sensor_{i}' for i in range(1, 22)]
+    
+    # Select specific sensor channels if provided
+    if selected_sensors is not None:
+        sensors = [f'sensor_{i}' for i in selected_sensors]
+    
     for eid in data['engine_id'].unique():
         series = data[data['engine_id'] == eid]
         s_vals, ruls = series[sensors].values, series['RUL'].values
@@ -31,33 +36,33 @@ class RULDataset(Dataset):
             'mask': torch.ones(self.X.shape[1])   
         }
 
-# === (3): Create data loaders with normalization ===
-def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, window=32, stride=16):
+# === (3): Create data loaders with per-sensor standardization ===
+def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, window=32, stride=16, selected_sensors=[2, 3, 4, 7, 8, 9, 11, 12, 13, 15, 17, 20]):
     from sklearn.preprocessing import StandardScaler
 
     # Load raw data
     train_df, test_df = load_cmapss(base_path)
 
-    # Create windows
-    X_train, y_train = create_windows(train_df, window=window, stride=stride)
-    X_test, y_test = create_windows(test_df, window=window, stride=stride)
+    # Create windows with selected sensor channels
+    X_train, y_train = create_windows(train_df, window=window, stride=stride, selected_sensors=selected_sensors)
+    X_test, y_test = create_windows(test_df, window=window, stride=stride, selected_sensors=selected_sensors)
 
-    # === (3.1) Normalize input features per channel (sensor) ===
+    # === (3.1) Per-sensor standardization to eliminate dimensional interference ===
     B, T, F = X_train.shape
     scalers = []
     
-    # Normalize each sensor channel separately
+    # Standardize each sensor channel separately
     for channel in range(F):
-        # Extract all data for this channel across all samples and time steps
+        # Extract all data for this sensor channel across all samples and time steps
         train_channel_data = X_train[:, :, channel].reshape(-1, 1)
         test_channel_data = X_test[:, :, channel].reshape(-1, 1)
         
-        # Fit scaler on training data for this channel
+        # Fit StandardScaler on training data for this specific sensor
         scaler = StandardScaler()
         train_channel_scaled = scaler.fit_transform(train_channel_data)
         test_channel_scaled = scaler.transform(test_channel_data)
         
-        # Reshape back and assign
+        # Reshape back and assign normalized values
         X_train[:, :, channel] = train_channel_scaled.reshape(B, T)
         X_test[:, :, channel] = test_channel_scaled.reshape(X_test.shape[0], T)
         
@@ -77,6 +82,8 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
     print("x:", batch['x'].shape)
     print("rul:", batch['rul'].shape)
     print("mask:", batch['mask'].shape)
-    print(f"\nTotal batches in train_loader: {len(train_loader)}")
+    print(f"\nSelected sensors: {selected_sensors}")
+    print(f"Number of sensor channels: {len(selected_sensors)}")
+    print(f"Total batches in train_loader: {len(train_loader)}")
 
-    return train_loader, val_loader, test_loader, scalers  # return per-channel scalers
+    return train_loader, val_loader, test_loader, scalers  # return per-sensor scalers
