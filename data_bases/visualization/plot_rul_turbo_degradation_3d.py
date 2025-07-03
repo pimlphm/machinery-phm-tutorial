@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 
 def plot_rul_degradation_3d(train_data):
     """
@@ -13,7 +13,10 @@ def plot_rul_degradation_3d(train_data):
     plotly.graph_objects.Figure: 3D line plot figure
     """
     # === Prepare data from all subsets ===
-    plot_data = []
+    fig = go.Figure()
+    
+    # Color map for different subsets
+    colors = {'FD001': 'blue', 'FD002': 'red', 'FD003': 'green', 'FD004': 'orange'}
 
     for subset_key in ['FD001', 'FD002', 'FD003', 'FD004']:
         data = train_data[subset_key]
@@ -23,29 +26,22 @@ def plot_rul_degradation_3d(train_data):
             unit_data = data[data[:, 0] == unit_id]
             cycles = unit_data[:, 1]
             rul = np.flip(np.arange(len(cycles)))  # decreasing RUL
-            for c, r in zip(cycles, rul):
-                plot_data.append({
-                    'Cycle': c,
-                    'Engine_ID': int(unit_id),
-                    'RUL': int(r),
-                    'Subset': subset_key
-                })
-
-    df_plot = pd.DataFrame(plot_data)
-
-    # === Plotly 3D line plot ===
-    fig = px.line_3d(
-        df_plot,
-        x='Cycle', y='Engine_ID', z='RUL',
-        color='Subset',
-        title='C-MAPSS Engine RUL Degradation Curves',
-        labels={'Cycle': 'Cycle', 'Engine_ID': 'Engine ID', 'RUL': 'Remaining Useful Life'}
-    )
+            
+            # Add each engine as a separate trace to avoid connecting between engines
+            fig.add_trace(go.Scatter3d(
+                x=cycles,
+                y=[int(unit_id)] * len(cycles),
+                z=rul,
+                mode='lines',
+                line=dict(color=colors[subset_key], width=3),
+                name=subset_key,
+                showlegend=(unit_id == unit_ids[0]),  # Only show legend for first engine of each subset
+                legendgroup=subset_key
+            ))
 
     # === Beautify ===
-    fig.update_traces(line=dict(width=3), selector=dict(type='scatter3d'))
-
     fig.update_layout(
+        title='C-MAPSS Engine RUL Degradation Curves',
         width=1000,
         height=800,
         margin=dict(l=0, r=0, t=50, b=0),
