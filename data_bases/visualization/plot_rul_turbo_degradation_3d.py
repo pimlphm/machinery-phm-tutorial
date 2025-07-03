@@ -35,7 +35,7 @@ def plot_rul_degradation_3d(train_data):
                 mode='lines',
                 line=dict(color=colors[subset_key], width=3),
                 name=subset_key,
-                showlegend=(unit_id == unit_ids[0]),  # Only show legend for first engine of each subset
+                showlegend=bool(unit_id == unit_ids[0]),  # Convert numpy bool to Python bool
                 legendgroup=subset_key
             ))
 
