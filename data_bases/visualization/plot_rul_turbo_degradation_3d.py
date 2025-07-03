@@ -50,7 +50,7 @@ def plot_rul_degradation_3d(train_data):
         template='simple_white',
         scene=dict(
             camera=dict(
-                eye=dict(x=2.5, y=2.5, z=1.5)
+                eye=dict(x=1.8, y=-1.2, z=0.8)
             ),
             xaxis=dict(title='Operation Cycles', backgroundcolor='white', showbackground=False, showgrid=False, zeroline=False),
             yaxis=dict(title='Engine ID', backgroundcolor='white', showbackground=False, showgrid=False, zeroline=False),
