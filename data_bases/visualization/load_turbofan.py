@@ -172,8 +172,181 @@ def load_turbofan_data(extract_path="turbofan_data"):
         train_rul[fd_key] = datasets[fd_key]['train_rul'].values
         test_rul[fd_key] = datasets[fd_key]['test_rul'].values
 
-    print("Data extraction completed:")
+    print("\nData extraction completed:")
     for fd_key in datasets.keys():
         print(f"{fd_key}: Train data shape: {train_data[fd_key].shape}, Test data shape: {test_data[fd_key].shape}")
+    
+    # Print detailed dimension information
+    print("\n" + "="*80)
+    print("DETAILED DIMENSION INFORMATION")
+    print("="*80)
+    
+    # Setting参数的物理含义
+    setting_descriptions = {
+        'setting1': 'Altitude (operational altitude setting)',
+        'setting2': 'Mach number (speed setting)',
+        'setting3': 'Throttle resolver angle (power setting)'
+    }
+    
+    # Sensor传感器的物理含义
+    sensor_descriptions = {
+        'sensor_1': 'Total temperature at fan inlet (T2)',
+        'sensor_2': 'Total temperature at LPC outlet (T24)',
+        'sensor_3': 'Total temperature at HPC outlet (T30)',
+        'sensor_4': 'Total temperature at LPT outlet (T50)',
+        'sensor_5': 'Pressure at fan inlet (P2)',
+        'sensor_6': 'Total pressure in bypass-duct (P15)',
+        'sensor_7': 'Total pressure at HPC outlet (P30)',
+        'sensor_8': 'Physical fan speed (Nf)',
+        'sensor_9': 'Physical core speed (Nc)',
+        'sensor_10': 'Engine pressure ratio (P30/P2)',
+        'sensor_11': 'Static pressure at HPC outlet (Ps30)',
+        'sensor_12': 'Ratio of fuel flow to Ps30',
+        'sensor_13': 'Corrected fan speed',
+        'sensor_14': 'Corrected core speed',
+        'sensor_15': 'Bypass Ratio',
+        'sensor_16': 'Burner fuel-air ratio',
+        'sensor_17': 'Bleed Enthalpy',
+        'sensor_18': 'Required fan speed',
+        'sensor_19': 'Required core speed',
+        'sensor_20': 'High pressure turbine efficiency',
+        'sensor_21': 'Low pressure turbine efficiency'
+    }
+    
+    for fd_key in datasets.keys():
+        print(f"\n{fd_key} Dataset:")
+        train_df = datasets[fd_key]['train_data']
+        test_df = datasets[fd_key]['test_data']
+        
+        print(f"\nTrain Data ({train_df.shape}):")
+        print(f"  Number of dimensions: {train_df.shape[1]}")
+        print(f"  Dimension details:")
+        for i, col in enumerate(train_df.columns):
+            print(f"    Dimension {i+1}: {col}")
+            if col == 'engine_id':
+                print(f"      - Description: Engine identifier")
+                print(f"      - Value range: {train_df[col].min()} to {train_df[col].max()}")
+                print(f"      - Number of unique engines: {train_df[col].nunique()}")
+            elif col == 'cycle':
+                print(f"      - Description: Time cycle (operational cycle)")
+                print(f"      - Value range: {train_df[col].min()} to {train_df[col].max()}")
+                print(f"      - Average cycles per engine: {train_df[col].max() / train_df['engine_id'].nunique():.1f}")
+            elif col.startswith('setting'):
+                desc = setting_descriptions.get(col, 'Operational setting parameter')
+                print(f"      - Description: {desc}")
+                print(f"      - Value range: {train_df[col].min():.4f} to {train_df[col].max():.4f}")
+                print(f"      - Mean: {train_df[col].mean():.4f}, Std: {train_df[col].std():.4f}")
+                print(f"      - Number of unique values: {train_df[col].nunique()}")
+            elif col.startswith('sensor_'):
+                desc = sensor_descriptions.get(col, 'Sensor measurement')
+                print(f"      - Description: {desc}")
+                print(f"      - Value range: {train_df[col].min():.4f} to {train_df[col].max():.4f}")
+                print(f"      - Mean: {train_df[col].mean():.4f}, Std: {train_df[col].std():.4f}")
+                # 检查是否有常量传感器
+                if train_df[col].nunique() == 1:
+                    print(f"      - ⚠️  WARNING: This sensor has constant values (no variation)")
+                elif train_df[col].std() < 0.001:
+                    print(f"      - ⚠️  WARNING: This sensor has very low variation")
+            elif col == 'RUL':
+                print(f"      - Description: Remaining Useful Life (target variable)")
+                print(f"      - Value range: {train_df[col].min()} to {train_df[col].max()}")
+                print(f"      - Mean: {train_df[col].mean():.2f}, Std: {train_df[col].std():.2f}")
+        
+        print(f"\nTest Data ({test_df.shape}):")
+        print(f"  Number of dimensions: {test_df.shape[1]}")
+        print(f"  Dimension details:")
+        for i, col in enumerate(test_df.columns):
+            print(f"    Dimension {i+1}: {col}")
+            if col == 'engine_id':
+                print(f"      - Description: Engine identifier")
+                print(f"      - Value range: {test_df[col].min()} to {test_df[col].max()}")
+                print(f"      - Number of unique engines: {test_df[col].nunique()}")
+            elif col == 'cycle':
+                print(f"      - Description: Time cycle (operational cycle)")
+                print(f"      - Value range: {test_df[col].min()} to {test_df[col].max()}")
+                print(f"      - Average cycles per engine: {test_df[col].max() / test_df['engine_id'].nunique():.1f}")
+            elif col.startswith('setting'):
+                desc = setting_descriptions.get(col, 'Operational setting parameter')
+                print(f"      - Description: {desc}")
+                print(f"      - Value range: {test_df[col].min():.4f} to {test_df[col].max():.4f}")
+                print(f"      - Mean: {test_df[col].mean():.4f}, Std: {test_df[col].std():.4f}")
+                print(f"      - Number of unique values: {test_df[col].nunique()}")
+            elif col.startswith('sensor_'):
+                desc = sensor_descriptions.get(col, 'Sensor measurement')
+                print(f"      - Description: {desc}")
+                print(f"      - Value range: {test_df[col].min():.4f} to {test_df[col].max():.4f}")
+                print(f"      - Mean: {test_df[col].mean():.4f}, Std: {test_df[col].std():.4f}")
+                # 检查是否有常量传感器
+                if test_df[col].nunique() == 1:
+                    print(f"      - ⚠️  WARNING: This sensor has constant values (no variation)")
+                elif test_df[col].std() < 0.001:
+                    print(f"      - ⚠️  WARNING: This sensor has very low variation")
+        
+        print(f"\n  Note: Test data has {test_df.shape[1]} dimensions (missing RUL column)")
+        print(f"        Train data has {train_df.shape[1]} dimensions (includes RUL column)")
+    
+    print("\n" + "="*80)
+    print("SETTING PARAMETERS DETAILED INFORMATION:")
+    print("="*80)
+    for setting, desc in setting_descriptions.items():
+        print(f"\n{setting.upper()}:")
+        print(f"  Physical meaning: {desc}")
+        
+        # 统计各数据集中该setting的信息
+        for fd_key in datasets.keys():
+            train_df = datasets[fd_key]['train_data']
+            if setting in train_df.columns:
+                unique_vals = sorted(train_df[setting].unique())
+                print(f"  {fd_key} - Unique values: {unique_vals}")
+                print(f"  {fd_key} - Value distribution:")
+                value_counts = train_df[setting].value_counts().sort_index()
+                for val, count in value_counts.items():
+                    print(f"    {val}: {count} samples ({count/len(train_df)*100:.1f}%)")
+    
+    print("\n" + "="*80)
+    print("SENSOR MEASUREMENTS DETAILED INFORMATION:")
+    print("="*80)
+    for sensor, desc in sensor_descriptions.items():
+        print(f"\n{sensor.upper()}:")
+        print(f"  Physical meaning: {desc}")
+        
+        # 检查哪些传感器在各数据集中是常量
+        for fd_key in datasets.keys():
+            train_df = datasets[fd_key]['train_data']
+            if sensor in train_df.columns:
+                unique_count = train_df[sensor].nunique()
+                std_val = train_df[sensor].std()
+                min_val = train_df[sensor].min()
+                max_val = train_df[sensor].max()
+                
+                print(f"  {fd_key} - Range: [{min_val:.4f}, {max_val:.4f}]")
+                print(f"  {fd_key} - Std: {std_val:.4f}, Unique values: {unique_count}")
+                
+                if unique_count == 1:
+                    print(f"  {fd_key} - ⚠️  CONSTANT SENSOR (no predictive value)")
+                elif std_val < 0.001:
+                    print(f"  {fd_key} - ⚠️  VERY LOW VARIATION (limited predictive value)")
+                elif std_val > 100:
+                    print(f"  {fd_key} - ℹ️  HIGH VARIATION (may need normalization)")
+    
+    print("\n" + "="*80)
+    print("SUMMARY:")
+    print("Train data dimensions (27):")
+    print("  1. engine_id - Engine identifier")
+    print("  2. cycle - Time cycle")
+    print("  3-5. setting1, setting2, setting3 - Operational settings:")
+    for i, (setting, desc) in enumerate(setting_descriptions.items(), 3):
+        print(f"      {i}. {setting}: {desc}")
+    print("  6-26. sensor_1 to sensor_21 - 21 sensor measurements:")
+    for i, (sensor, desc) in enumerate(sensor_descriptions.items(), 6):
+        print(f"      {i}. {sensor}: {desc}")
+    print("  27. RUL - Remaining Useful Life (target variable)")
+    print("\nTest data dimensions (26):")
+    print("  1. engine_id - Engine identifier")
+    print("  2. cycle - Time cycle")
+    print("  3-5. setting1, setting2, setting3 - Operational settings")
+    print("  6-26. sensor_1 to sensor_21 - 21 sensor measurements")
+    print("  Note: RUL is provided separately in RUL files for test data")
+    print("="*80)
     
     return train_data,test_data,train_rul,test_rul
