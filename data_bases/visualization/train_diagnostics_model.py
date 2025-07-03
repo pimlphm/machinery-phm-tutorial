@@ -42,5 +42,3 @@ def train_diagnostics_model(model, X_train_scaled, y_train_cat, X_val_scaled, y_
     
     return history
 
-# Call the function
-history = train_diagnostics_model(model, X_train_scaled, y_train_cat, X_val_scaled, y_val_cat)
