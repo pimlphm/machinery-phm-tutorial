@@ -334,9 +334,9 @@ def load_turbofan_data(extract_path="turbofan_data"):
     print("Train data dimensions (27):")
     print("  1. engine_id - Engine identifier")
     print("  2. cycle - Time cycle")
-    print("  3-5. setting1, setting2, setting3 - Operational settings:")
-    for i, (setting, desc) in enumerate(setting_descriptions.items(), 3):
-        print(f"      {i}. {setting}: {desc}")
+    print("  3-5. setting1, setting2, setting3 - Operational settings")
+    # for i, (setting, desc) in enumerate(setting_descriptions.items(), 3):
+    #     print(f"      {i}. {setting}: {desc}")
     print("  6-26. sensor_1 to sensor_21 - 21 sensor measurements:")
     for i, (sensor, desc) in enumerate(sensor_descriptions.items(), 6):
         print(f"      {i}. {sensor}: {desc}")
