@@ -49,7 +49,7 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     try:
         print("\n🔍 Computing SHAP feature importance...")
         # Use much smaller samples for speed
-        background = X_test_scaled[np.random.choice(len(X_test_scaled), 10, replace=False)]
+        background = X_test_scaled[np.random.choice(len(X_test_scaled), 5, replace=False)]
         explainer = shap.KernelExplainer(lambda x: model.predict(x), background)
         shap_values = explainer.shap_values(X_test_scaled[:5])  # Only 5 samples
         if isinstance(shap_values, list):
@@ -92,7 +92,7 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
 
     # Visualization
     fnames = [f"F{i+1}" for i in range(X_test_scaled.shape[1])]
-    top10_indices = shap_mean.argsort()[-10:] if len(shap_mean) >= 10 else shap_mean.argsort()
+    top5_indices = shap_mean.argsort()[-5:] if len(shap_mean) >= 5 else shap_mean.argsort()
     fig, axs = plt.subplots(2, 2, figsize=(14, 10))
 
     # Confusion Matrix
@@ -119,10 +119,10 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     axs[1,0].legend()
 
     # SHAP Bar Plot
-    n_features = min(10, len(top10_indices))
-    axs[1,1].barh(range(n_features), shap_mean[top10_indices][:n_features], align='center')
+    n_features = min(5, len(top5_indices))
+    axs[1,1].barh(range(n_features), shap_mean[top5_indices][:n_features], align='center')
     axs[1,1].set_yticks(range(n_features))
-    axs[1,1].set_yticklabels([fnames[i] for i in top10_indices[:n_features]])
+    axs[1,1].set_yticklabels([fnames[i] for i in top5_indices[:n_features]])
     axs[1,1].set(title=f"Top {n_features} SHAP Importance", xlabel="Mean |Impact|")
 
     plt.tight_layout()
