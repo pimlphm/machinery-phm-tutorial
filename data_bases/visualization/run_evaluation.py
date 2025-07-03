@@ -127,3 +127,5 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
 
     plt.tight_layout()
     plt.show()
+
+    y_test_cat=y_test_cat,
