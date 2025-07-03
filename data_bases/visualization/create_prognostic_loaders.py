@@ -32,32 +32,39 @@ class RULDataset(Dataset):
         }
 
 # === (3): Create data loaders with normalization ===
-def create_data_loaders(base_path="/content/turbofan_data", batch_size=64):
+def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, window=32, stride=16):
     from sklearn.preprocessing import StandardScaler
 
     # Load raw data
     train_df, test_df = load_cmapss(base_path)
 
     # Create windows
-    X_train, y_train = create_windows(train_df)
-    X_test, y_test = create_windows(test_df)
+    X_train, y_train = create_windows(train_df, window=window, stride=stride)
+    X_test, y_test = create_windows(test_df, window=window, stride=stride)
 
-    # === (3.1) Normalize input features across channels ===
+    # === (3.1) Normalize input features per channel (sensor) ===
     B, T, F = X_train.shape
-    X_train_flat = X_train.reshape(-1, F)
-    X_test_flat = X_test.reshape(-1, F)
+    scalers = []
+    
+    # Normalize each sensor channel separately
+    for channel in range(F):
+        # Extract all data for this channel across all samples and time steps
+        train_channel_data = X_train[:, :, channel].reshape(-1, 1)
+        test_channel_data = X_test[:, :, channel].reshape(-1, 1)
+        
+        # Fit scaler on training data for this channel
+        scaler = StandardScaler()
+        train_channel_scaled = scaler.fit_transform(train_channel_data)
+        test_channel_scaled = scaler.transform(test_channel_data)
+        
+        # Reshape back and assign
+        X_train[:, :, channel] = train_channel_scaled.reshape(B, T)
+        X_test[:, :, channel] = test_channel_scaled.reshape(X_test.shape[0], T)
+        
+        scalers.append(scaler)
 
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train_flat)
-    X_test_scaled = scaler.transform(X_test_flat)
-
-    X_train = X_train_scaled.reshape(B, T, F)
-    X_test = X_test_scaled.reshape(X_test.shape[0], T, F)
-
-    # === (3.2) Normalize RUL labels ===
-    rul_max = y_train.max()
-    y_train = y_train / rul_max
-    y_test = y_test / rul_max
+    # === (3.2) Keep original RUL labels (no normalization) ===
+    # y_train and y_test remain unchanged
 
     # === (4): DataLoaders
     train_loader = DataLoader(RULDataset(X_train, y_train), batch_size, shuffle=True)
@@ -72,4 +79,4 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64):
     print("mask:", batch['mask'].shape)
     print(f"\nTotal batches in train_loader: {len(train_loader)}")
 
-    return train_loader, val_loader, test_loader, scaler, rul_max  # return scalers if needed
+    return train_loader, val_loader, test_loader, scalers  # return per-channel scalers
