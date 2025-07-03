@@ -2,7 +2,7 @@
 import ipywidgets as widgets
 from IPython.display import display
 import matplotlib.pyplot as plt
-from tensorflow.keras.models import Model
+from tensorflow.keras.models import Model, load_model
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -53,6 +53,3 @@ def interactive_layer_pca_visualization(model, X_test_scaled, y_test):
     
     # Display the widget
     display(interactive_plot)
-
-# Call the interactive visualization function
-interactive_layer_pca_visualization(model_diagnostic, X_test_scaled, y_test)
