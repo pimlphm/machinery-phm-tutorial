@@ -48,10 +48,10 @@ def run_evaluation(model_path, X_test_scaled, y_test_cat, class_names):
     # SHAP - Use very small sample for speed
     try:
         print("\n🔍 Computing SHAP feature importance...")
-        # Use much smaller samples for speed
-        background = X_test_scaled[np.random.choice(len(X_test_scaled), 5, replace=False)]
+        # Use even smaller samples for faster computation
+        background = X_test_scaled[np.random.choice(len(X_test_scaled), 3, replace=False)]
         explainer = shap.KernelExplainer(lambda x: model.predict(x), background)
-        shap_values = explainer.shap_values(X_test_scaled[:5])  # Only 5 samples
+        shap_values = explainer.shap_values(X_test_scaled[:3])  # Only 3 samples
         if isinstance(shap_values, list):
             # For multi-class models
             shap_mean = np.mean([np.abs(sv) for sv in shap_values], axis=(0, 1))
