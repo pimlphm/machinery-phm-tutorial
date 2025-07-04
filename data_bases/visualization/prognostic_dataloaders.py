@@ -1,216 +1,134 @@
-# === Basic Python ===
 import os
-
-# === Data Handling ===
 import pandas as pd
 import numpy as np
-
-# === Plotting (Optional for visualization analysis) ===
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# === Machine Learning Utilities ===
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
 from sklearn.cluster import KMeans
-
-# === Import additional libraries ===
-import numpy as np, torch
-import pandas as pd
+import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectKBest, f_regression
-from scipy.stats import pearsonr
-from scipy import stats
-import warnings
-warnings.filterwarnings('ignore')
+from tqdm import tqdm
 
-# === Global Configuration ===
-sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
-BATCH_SIZE = 256
-
-# === CMAPSS Data Processing Pipeline with Sliding Window and Operating Condition Normalization ===
-def process_cmapss_data_complete(base_path="/content/turbofan_data",
-                                batch_size=128,
-                                window_size=32,
-                                stride=16,
-                                selected_sensors=[2, 3, 4, 7, 8, 9, 11, 12, 13, 15, 17, 20],
-                                fd_datasets=['FD001','FD002','FD003','FD004'],
-                                train_ratio=0.7,
-                                val_ratio=0.15,
-                                seed=42,
-                                device='cuda' if torch.cuda.is_available() else 'cpu'):
+# === Data Loader ===
+def prepare_cmapss_loaders(
+    data_root: str,
+    subsets: list = ['FD001','FD002','FD003','FD004'],
+    condition_normalize: list = ['FD002','FD004'],
+    batch_size: int = 8,
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.15
+):
     """
-    CMAPSS data processing pipeline with sliding window and operating condition normalization
-    
-    Args:
-        base_path: Path to CMAPSS data files
-        batch_size: Batch size for DataLoaders
-        window_size: Window size for sequence processing
-        stride: Stride for sliding window
-        selected_sensors: Specific sensors to use
-        fd_datasets: List of FD datasets to process
-        train_ratio: Ratio for training split
-        val_ratio: Ratio for validation split
-        seed: Random seed for reproducibility
-        device: Device for tensors
+    Step 1: Define column names and sensor columns for CMAPSS dataset
+    This includes unit number, time cycles, 3 settings, and 21 sensors
     """
-    
-    # === Dataset Class for Sliding Window ===
-    class SlidingWindowDataset(Dataset):
-        def __init__(self, windows, device='cpu'):
-            self.windows = windows
-            self.device = device
+    columns = ['unit_number','time_in_cycles','setting_1','setting_2','setting_3'] \
+            + [f'sensor_{i}' for i in range(1, 22)]
+    sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
+    setting_cols = ['setting_1','setting_2','setting_3']
 
-        def __len__(self):
-            return len(self.windows)
+    all_samples = []
+    for subset in subsets:
+        file_path = os.path.join(data_root, f"train_{subset}.txt")
+        if not os.path.exists(file_path):
+            continue
 
-        def __getitem__(self, i):
-            window = self.windows[i]
-            x = torch.from_numpy(window['x'].astype('float32')).to(self.device)  # (window_size, C)
-            rul = torch.tensor(window['rul'], dtype=torch.float32).to(self.device)  # scalar
-            mask = torch.ones(x.shape[0], dtype=torch.bool).to(self.device)  # (window_size,) - all valid
-            
-            return x, rul, mask, window['unit'], window['subset']
+        """
+        Step 2: Load and parse the dataset file
+        Each file contains space-separated values without headers
+        """
+        df = pd.read_csv(file_path, sep='\s+', header=None, names=columns)
 
-    # === Load CMAPSS Data ===
-    def load_cmapss_internal(base_path, dataset):
-        cols = ['engine_id', 'cycle', 'setting1', 'setting2', 'setting3'] + [f'sensor_{i}' for i in range(1, 22)]
-        
-        # Load training data
-        train = pd.read_csv(f"{base_path}/train_{dataset}.txt", sep='\s+', header=None, names=cols)
-        
-        # Load test data and RUL
-        test = pd.read_csv(f"{base_path}/test_{dataset}.txt", sep='\s+', header=None, names=cols)
-        rul = pd.read_csv(f"{base_path}/RUL_{dataset}.txt", sep='\s+', header=None, names=['true_RUL'])
-        
-        # Calculate RUL for training data
-        max_cycle = train.groupby('engine_id')['cycle'].transform('max')
-        train['RUL'] = max_cycle - train['cycle']
-        
-        # Calculate RUL for test data
-        test['max_cycle'] = test.groupby('engine_id')['cycle'].transform('max')
-        test['RUL'] = test.apply(
-            lambda row: rul.iloc[int(row['engine_id']) - 1, 0] + (row['max_cycle'] - row['cycle']),
-            axis=1
-        )
-        test.drop('max_cycle', axis=1, inplace=True)
-        
-        return train, test
-    
-    # === 1. Load Data ===
-    train_dfs, test_dfs = [], []
-    
-    for fd_name in fd_datasets:
-        train_df, test_df = load_cmapss_internal(base_path, fd_name)
-        train_df['dataset'] = fd_name
-        test_df['dataset'] = fd_name
-        train_dfs.append(train_df)
-        test_dfs.append(test_df)
-    
-    # Combine datasets
-    if len(train_dfs) > 1:
-        train_df = pd.concat(train_dfs, ignore_index=True)
-        test_df = pd.concat(test_dfs, ignore_index=True)
-    else:
-        train_df = train_dfs[0]
-        test_df = test_dfs[0]
-    
-    # === 2. Channel Selection ===
-    sensor_cols_to_use = [f'sensor_{i}' for i in selected_sensors]
-    
-    # === 3. Operating Condition Normalization ===
-    def apply_operating_condition_normalization(df, sensor_cols):
-        """Apply Z-score normalization grouped by operating conditions"""
-        # Define operating conditions based on setting values
-        # Group by discrete operating conditions (settings)
-        df['operating_condition'] = df.apply(
-            lambda x: f"{x['setting1']:.1f}_{x['setting2']:.1f}_{x['setting3']:.1f}", 
-            axis=1
-        )
-        
-        # Apply Z-score normalization for each sensor within each operating condition
-        for sensor_col in sensor_cols:
-            for condition in df['operating_condition'].unique():
-                condition_mask = df['operating_condition'] == condition
-                condition_data = df.loc[condition_mask, sensor_col]
-                
-                if len(condition_data) > 1 and condition_data.std() > 1e-8:
-                    # Z-score normalization
-                    mean_val = condition_data.mean()
-                    std_val = condition_data.std()
-                    df.loc[condition_mask, sensor_col] = (condition_data - mean_val) / std_val
-        
-        return df
-    
-    # Apply normalization to training and test data
-    train_df = apply_operating_condition_normalization(train_df, sensor_cols_to_use)
-    test_df = apply_operating_condition_normalization(test_df, sensor_cols_to_use)
-    
-    # === 4. Create Sliding Windows ===
-    def create_sliding_windows(df, sensor_cols, window_size, stride):
-        windows = []
-        
-        for engine_id in df['engine_id'].unique():
-            engine_data = df[df['engine_id'] == engine_id].sort_values('cycle')
-            
-            # Extract sensor data and RUL
-            sensor_data = engine_data[sensor_cols].values
-            rul_data = engine_data['RUL'].values
-            dataset_name = engine_data['dataset'].iloc[0]
-            
-            # Create sliding windows
-            for start in range(0, len(sensor_data) - window_size + 1, stride):
-                end = start + window_size
-                
-                window = {
-                    'x': sensor_data[start:end],  # (window_size, num_sensors)
-                    'rul': rul_data[end-1],       # RUL at the end of window
-                    'unit': engine_id,
-                    'subset': dataset_name
-                }
-                windows.append(window)
-        
-        return windows
-    
-    # Create windows for training and test data
-    train_windows = create_sliding_windows(train_df, sensor_cols_to_use, window_size, stride)
-    test_windows = create_sliding_windows(test_df, sensor_cols_to_use, window_size, stride)
-    
-    # === 5. Split Data ===
-    np.random.seed(seed)
-    all_windows = train_windows + test_windows
+        """
+        Step 3: Calculate Remaining Useful Life (RUL) for each unit
+        RUL = maximum cycle time - current cycle time for each unit
+        """
+        max_cycle = df.groupby('unit_number')['time_in_cycles'] \
+                      .max().reset_index().rename(columns={'time_in_cycles':'max_cycle'})
+        df = df.merge(max_cycle, on='unit_number')
+        df['RUL'] = df['max_cycle'] - df['time_in_cycles']
+        df.drop('max_cycle', axis=1, inplace=True)
 
-    
-    N = len(all_windows)
-    n_train = int(train_ratio * N)
-    n_val = int((train_ratio + val_ratio) * N)
-    
-    train_windows = all_windows[:n_train]
-    val_windows = all_windows[n_train:n_val]
-    test_windows = all_windows[n_val:]
-    
-    # === 6. Create Datasets and DataLoaders ===
-    train_dataset = SlidingWindowDataset(train_windows, device)
-    val_dataset = SlidingWindowDataset(val_windows, device)
-    test_dataset = SlidingWindowDataset(test_windows, device)
-    
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    
-    print(f"Total windows: {len(all_windows)}")
-    print(f"Train / Val / Test: {len(train_windows)} / {len(val_windows)} / {len(test_windows)}")
-    print(f"Window size: {window_size}, Stride: {stride}")
-    print(f"Selected sensors: {selected_sensors}")
-    
-    # Show sample batch
-    batch = next(iter(train_loader))
-    print(f"Batch x shape: {batch[0].shape}")  # (batch_size, window_size, num_sensors)
-    print(f"Batch rul shape: {batch[1].shape}")  # (batch_size,)
-    print(f"Batch mask shape: {batch[2].shape}")  # (batch_size, window_size)
-    
-    return train_loader, val_loader, test_loader
+        """
+        Step 4: Normalize sensor data with proper dtype handling
+        Fix pandas FutureWarning by ensuring compatible dtypes
+        """
+        if subset in condition_normalize:
+            # Group by operating conditions using KMeans clustering
+            df['condition_id'] = KMeans(n_clusters=6, random_state=0) \
+                                   .fit_predict(df[setting_cols])
+            df_scaled = df.copy()
+            for cond in df['condition_id'].unique():
+                mask = df['condition_id']==cond
+                # Fix: Explicitly convert to float64 to match pandas dtype expectations
+                scaled_values = StandardScaler().fit_transform(df.loc[mask, sensor_cols])
+                df_scaled.loc[mask, sensor_cols] = scaled_values.astype('float64')
+            df = df_scaled.drop('condition_id', axis=1)
+        else:
+            # Fix: Explicitly convert to float64 for standard normalization
+            scaled_values = StandardScaler().fit_transform(df[sensor_cols])
+            df[sensor_cols] = scaled_values.astype('float64')
+
+        """
+        Step 5: Extract sequences for each unit and sort by time
+        Each unit becomes a separate time series sample
+        """
+        for uid in df['unit_number'].unique():
+            seq_df = df[df['unit_number']==uid] \
+                        .sort_values('time_in_cycles') \
+                        .reset_index(drop=True)
+            all_samples.append({'unit':int(uid),'subset':subset,'data':seq_df})
+
+    """
+    Step 6: Split data into train/validation/test sets
+    Use deterministic shuffling for reproducibility
+    """
+    np.random.seed(0)
+    np.random.shuffle(all_samples)
+    N = len(all_samples)
+    n1 = int(train_ratio * N)
+    n2 = int((train_ratio+val_ratio) * N)
+    train_samples = all_samples[:n1]
+    val_samples   = all_samples[n1:n2]
+    test_samples  = all_samples[n2:]
+
+    """
+    Step 7: Define PyTorch Dataset class for CMAPSS data
+    Converts pandas dataframes to PyTorch tensors
+    """
+    class CMAPSSDataset(Dataset):
+        def __init__(self, samples):
+            self.samples = samples
+        def __len__(self): return len(self.samples)
+        def __getitem__(self, idx):
+            s = self.samples[idx]
+            df_seq = s['data']
+            x = torch.tensor(df_seq[sensor_cols].values, dtype=torch.float32)
+            rul = torch.tensor(df_seq['RUL'].values, dtype=torch.float32)
+            return {'x':x,'rul':rul,'unit':s['unit'],'subset':s['subset']}
+
+    """
+    Step 8: Define collate function for batching variable-length sequences
+    Pads sequences to the same length and creates attention masks
+    """
+    def collate_fn(batch):
+        lengths = [b['x'].size(0) for b in batch]
+        T_max = max(lengths); C = batch[0]['x'].size(1); B = len(batch)
+        x_batch = torch.zeros(B,T_max,C)
+        rul_batch = torch.zeros(B,T_max)
+        mask = torch.zeros(B,T_max)
+        for i,b in enumerate(batch):
+            L = b['x'].size(0)
+            x_batch[i,:L] = b['x']
+            rul_batch[i,:L] = b['rul']
+            mask[i,:L] = 1
+        return {'x':x_batch,'rul':rul_batch,'mask':mask}
+
+    def make_loader(samples, shuffle):
+        ds = CMAPSSDataset(samples)
+        return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
+
+    return make_loader(train_samples, True), make_loader(val_samples, False), make_loader(test_samples, False)
+
 
 # # === Basic Python ===
 # import os
