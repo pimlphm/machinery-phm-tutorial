@@ -34,6 +34,13 @@ def load_cmapss(base_path, dataset=None):
         test.drop('max_cycle', axis=1, inplace=True)
         test['dataset'] = dataset_num  # Add subset label
 
+        # Clip RUL values: remove bottom 5% and top 5% of RUL values
+        train_rul_quantiles = train['RUL'].quantile([0.05, 0.95])
+        train = train[(train['RUL'] >= train_rul_quantiles[0.05]) & (train['RUL'] <= train_rul_quantiles[0.95])]
+        
+        test_rul_quantiles = test['RUL'].quantile([0.05, 0.95])
+        test = test[(test['RUL'] >= test_rul_quantiles[0.05]) & (test['RUL'] <= test_rul_quantiles[0.95])]
+
         return train, test
     
     # Original behavior: load all datasets if no specific dataset is requested
@@ -72,6 +79,13 @@ def load_cmapss(base_path, dataset=None):
         test.drop('max_cycle', axis=1, inplace=True)
         test['dataset'] = i  # Add subset label
         test_all = pd.concat([test_all, test], ignore_index=True)  # Append to the global test set
+
+    # Clip RUL values for combined datasets: remove bottom 5% and top 5% of RUL values
+    train_rul_quantiles = train_all['RUL'].quantile([0.05, 0.95])
+    train_all = train_all[(train_all['RUL'] >= train_rul_quantiles[0.05]) & (train_all['RUL'] <= train_rul_quantiles[0.95])]
+    
+    test_rul_quantiles = test_all['RUL'].quantile([0.05, 0.95])
+    test_all = test_all[(test_all['RUL'] >= test_rul_quantiles[0.05]) & (test_all['RUL'] <= test_rul_quantiles[0.95])]
 
     # Return concatenated training and test DataFrames covering FD001 to FD004
     return train_all, test_all
