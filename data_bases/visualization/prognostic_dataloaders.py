@@ -311,16 +311,17 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         return features
     
     def create_windows_with_statistical_features(data, window_size, stride, sensor_indices):
-        """创建滑动窗口并提取统计特征，返回 [batch, 通道, 统计特征] 格式"""
+        """创建滑动窗口并提取统计特征，返回 [batch, 通道, 统计特征] 格式，保持时间顺序"""
         X, y, window_indices = [], [], []
         sensors = [f'sensor_{i}' for i in sensor_indices]
         
-        for eid in data['engine_id'].unique():
+        # 保持引擎ID的原始顺序，不打乱
+        for eid in sorted(data['engine_id'].unique()):
             series = data[data['engine_id'] == eid].sort_values('cycle')
             s_vals = series[sensors].values
             ruls = series['RUL'].values
             
-            # Create sliding windows
+            # Create sliding windows，保持时间顺序
             for i in range(0, len(s_vals) - window_size + 1, stride):
                 window_data = s_vals[i:i+window_size]
                 window_rul = ruls[i + window_size - 1]  # RUL at the end of window
@@ -373,8 +374,8 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     train_dataset = RULDataset(X_train, y_train)
     test_dataset = RULDataset(X_test, y_test)
     
-    # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Create data loaders - 不打乱顺序
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)  # Using train for validation
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
