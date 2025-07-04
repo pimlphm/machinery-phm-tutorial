@@ -14,7 +14,16 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 # === Utility ===
 from tqdm import tqdm  # Progress bar for training loops
-
+def compute_reconstruction_loss(x_pred, x_target, mask):
+    """
+    Custom reconstruction loss:
+    - Mean squared error over valid (non-padded) time steps and features
+    - Applies sequence mask to exclude padding from the loss
+    """
+    mse = nn.MSELoss(reduction='none')  # No reduction so we can apply the mask
+    raw_loss = mse(x_pred, x_target)   # Shape: [B, T, C]
+    masked_loss = raw_loss * mask.unsqueeze(-1)  # Apply mask: [B, T, 1]
+    return masked_loss.sum() / mask.sum()        # Normalize by valid element count
 def train_rul_model_with_optional_reconstruction(
     model,
     train_loader,
