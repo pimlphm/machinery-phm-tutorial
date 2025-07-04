@@ -71,13 +71,7 @@ def process_cmapss_data_complete(base_path="/content/turbofan_data",
             rul = torch.tensor(window['rul'], dtype=torch.float32).to(self.device)  # scalar
             mask = torch.ones(x.shape[0], dtype=torch.bool).to(self.device)  # (window_size,) - all valid
             
-            return {
-                'x': x,
-                'rul': rul,
-                'mask': mask,
-                'unit': window['unit'],
-                'subset': window['subset']
-            }
+            return x, rul, mask, window['unit'], window['subset']
 
     # === Load CMAPSS Data ===
     def load_cmapss_internal(base_path, dataset):
@@ -212,13 +206,11 @@ def process_cmapss_data_complete(base_path="/content/turbofan_data",
     
     # Show sample batch
     batch = next(iter(train_loader))
-    print(f"Batch x shape: {batch['x'].shape}")  # (batch_size, window_size, num_sensors)
-    print(f"Batch rul shape: {batch['rul'].shape}")  # (batch_size,)
-    print(f"Batch mask shape: {batch['mask'].shape}")  # (batch_size, window_size)
+    print(f"Batch x shape: {batch[0].shape}")  # (batch_size, window_size, num_sensors)
+    print(f"Batch rul shape: {batch[1].shape}")  # (batch_size,)
+    print(f"Batch mask shape: {batch[2].shape}")  # (batch_size, window_size)
     
     return train_loader, val_loader, test_loader
-
-
 
 # # === Basic Python ===
 # import os
