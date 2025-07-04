@@ -1,44 +1,30 @@
-def comprehensive_model_evaluation_and_visualization(model_class, test_loader, save_path='best_enhanced_model.pth',
-                                                   sensor_channels=list(range(1, 22)),
-                                                   n_engines=6, figsize=(16, 20)):
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tqdm import tqdm
+def comprehensive_model_evaluation(model_save_path, test_loader, 
+                                 sensor_channels=list(range(1, 22)),
+                                 n_engines=6, figsize=(16, 20)):
     """
-    Comprehensive evaluation and visualization function for the enhanced LSTM autoencoder model.
+    Comprehensive evaluation and visualization of the enhanced LSTM autoencoder model.
     
     Args:
-        model_class: The model class to instantiate (not the trained instance)
+        model_save_path (str): Path to the saved model checkpoint
         test_loader: DataLoader for test data
-        save_path: Path to the saved model checkpoint
-        sensor_channels: List of sensor channel indices to visualize
-        n_engines: Number of engines to show in multi-engine plot
-        figsize: Figure size for the plots
+        sensor_channels (list): List of sensor channels to visualize
+        n_engines (int): Number of engines to display in multi-engine plot
+        figsize (tuple): Figure size for the plots
     
     Returns:
-        dict: Dictionary containing evaluation metrics and results
+        dict: Dictionary containing all evaluation metrics
     """
-    
-    import torch
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    from tqdm import tqdm
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # Load best model from checkpoint
-    checkpoint = torch.load(save_path, map_location=device)
-    
-    # Create model instance and load state dict
-    model = model_class().to(device)
-    
-    # Handle different checkpoint formats
-    if 'model_state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['model_state_dict'])
-    elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['state_dict'])
-    else:
-        # Assume the checkpoint is the state dict itself
-        model.load_state_dict(checkpoint)
-    
+    # Load best model
+    checkpoint = torch.load(model_save_path, map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
     # Set style for publication-quality plots
@@ -73,48 +59,9 @@ def comprehensive_model_evaluation_and_visualization(model_class, test_loader, s
 
     print(f"Collected data for {len(engine_data)} engines")
 
-    # Calculate comprehensive evaluation metrics
-    def calculate_comprehensive_metrics(predictions, targets):
-        """
-        Calculate RMSE, Score (Time-Deviation Penalty Index), and Accuracy metrics
-        
-        Args:
-            predictions: predicted RUL values
-            targets: ground truth RUL values
-            
-        Returns:
-            dict: Dictionary containing all evaluation metrics
-        """
-        # Calculate deviation
-        dm = predictions - targets
-        M = len(dm)
-        
-        # (1) Root Mean Square Error (RMSE)
-        rmse = np.sqrt(np.mean(dm ** 2))
-        
-        # (2) Score (Time-Deviation Penalty Index)
-        # Apply asymmetric penalties: early predictions (dm < 0) and late predictions (dm >= 0)
-        score_values = np.where(dm < 0, 
-                               np.exp(-dm / 13) - 1,  # Early prediction penalty
-                               np.exp(dm / 10) - 1)   # Late prediction penalty (higher)
-        score = np.sum(score_values)
-        
-        # (3) Accuracy (Tolerance-Based)
-        # Percentage of predictions within acceptable error range [-13, +10] cycles
-        tolerance_mask = (dm >= -13) & (dm <= 10)
-        accuracy = np.mean(tolerance_mask) * 100
-        
-        return {
-            'rmse': rmse,
-            'score': score,
-            'accuracy': accuracy,
-            'deviations': dm,
-            'n_samples': M
-        }
-
     # Create figure with subplots
     fig = plt.figure(figsize=figsize)
-    gs = fig.add_gridspec(4, 3, height_ratios=[1, 1, 0.8, 1.2], hspace=0.4, wspace=0.25,
+    gs = fig.add_gridspec(3, 3, height_ratios=[1, 1, 1.2], hspace=0.35, wspace=0.25,
                          left=0.08, right=0.95, top=0.95, bottom=0.05)
 
     # Color scheme
@@ -201,13 +148,11 @@ def comprehensive_model_evaluation_and_visualization(model_class, test_loader, s
     ax2.plot(time_detailed, pred_valid_detailed, color=colors['predicted'],
              linewidth=3, label='Predicted', marker='s', markersize=3, alpha=0.9)
 
-    # Calculate comprehensive metrics for this engine
-    detailed_metrics = calculate_comprehensive_metrics(pred_valid_detailed, target_valid_detailed)
+    # Calculate and display metrics
+    mse = np.mean((pred_valid_detailed - target_valid_detailed) ** 2)
+    mae = np.mean(np.abs(pred_valid_detailed - target_valid_detailed))
 
-    ax2.text(0.02, 0.98, 
-             f'RMSE: {detailed_metrics["rmse"]:.3f}\n'
-             f'Score: {detailed_metrics["score"]:.3f}\n'
-             f'Accuracy: {detailed_metrics["accuracy"]:.1f}%',
+    ax2.text(0.02, 0.98, f'MSE: {mse:.3f}\nMAE: {mae:.3f}',
              transform=ax2.transAxes, fontsize=11, fontweight='bold',
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
@@ -220,66 +165,12 @@ def comprehensive_model_evaluation_and_visualization(model_class, test_loader, s
     ax2.spines['top'].set_visible(False)
     ax2.spines['right'].set_visible(False)
 
-    # Plot 3: Evaluation Metrics Visualization
-    ax3_left = fig.add_subplot(gs[2, 0])
-    ax3_center = fig.add_subplot(gs[2, 1])
-    ax3_right = fig.add_subplot(gs[2, 2])
-
-    # Calculate overall metrics
-    all_valid_predictions = []
-    all_valid_targets = []
-
-    for engine in engine_data:
-        mask = engine['mask'].astype(bool)
-        if np.any(mask):
-            all_valid_predictions.extend(engine['prediction'][mask])
-            all_valid_targets.extend(engine['target'][mask])
-
-    all_valid_predictions = np.array(all_valid_predictions)
-    all_valid_targets = np.array(all_valid_targets)
-    overall_metrics = calculate_comprehensive_metrics(all_valid_predictions, all_valid_targets)
-
-    # Error distribution histogram
-    ax3_left.hist(overall_metrics['deviations'], bins=50, alpha=0.7, color=colors['predicted'], edgecolor='black')
-    ax3_left.axvline(0, color='red', linestyle='--', linewidth=2, label='Perfect Prediction')
-    ax3_left.axvline(-13, color='orange', linestyle='--', alpha=0.7, label='Tolerance Range')
-    ax3_left.axvline(10, color='orange', linestyle='--', alpha=0.7)
-    ax3_left.set_xlabel('Prediction Error (cycles)', fontsize=10, fontweight='bold')
-    ax3_left.set_ylabel('Frequency', fontsize=10, fontweight='bold')
-    ax3_left.set_title('Error Distribution', fontsize=12, fontweight='bold')
-    ax3_left.legend(fontsize=9)
-    ax3_left.grid(True, alpha=0.3)
-
-    # Metrics bar plot
-    metric_names = ['RMSE', 'Score', 'Accuracy (%)']
-    metric_values = [overall_metrics['rmse'], overall_metrics['score'], overall_metrics['accuracy']]
-    bars = ax3_center.bar(metric_names, metric_values, color=[colors['predicted'], colors['actual'], colors['reconstructed']])
-    ax3_center.set_title('Performance Metrics', fontsize=12, fontweight='bold')
-    ax3_center.set_ylabel('Metric Value', fontsize=10, fontweight='bold')
-    
-    # Add value labels on bars
-    for bar, value in zip(bars, metric_values):
-        height = bar.get_height()
-        ax3_center.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{value:.2f}', ha='center', va='bottom', fontweight='bold')
-
-    # Scatter plot: Predicted vs Actual
-    ax3_right.scatter(all_valid_targets, all_valid_predictions, alpha=0.6, color=colors['predicted'], s=20)
-    min_rul = min(np.min(all_valid_targets), np.min(all_valid_predictions))
-    max_rul = max(np.max(all_valid_targets), np.max(all_valid_predictions))
-    ax3_right.plot([min_rul, max_rul], [min_rul, max_rul], 'r--', linewidth=2, label='Perfect Prediction')
-    ax3_right.set_xlabel('Actual RUL', fontsize=10, fontweight='bold')
-    ax3_right.set_ylabel('Predicted RUL', fontsize=10, fontweight='bold')
-    ax3_right.set_title('Predicted vs Actual RUL', fontsize=12, fontweight='bold')
-    ax3_right.legend(fontsize=9)
-    ax3_right.grid(True, alpha=0.3)
-
-    # Plot 4: Sensor Reconstruction for Selected Channels
+    # Plot 3: Sensor Reconstruction for Selected Channels
     n_sensors = len(sensor_channels)
     n_cols = 3
     n_rows = (n_sensors + n_cols - 1) // n_cols
 
-    gs_sensors = gs[3, :].subgridspec(n_rows, n_cols, hspace=0.4, wspace=0.3)
+    gs_sensors = gs[2, :].subgridspec(n_rows, n_cols, hspace=0.4, wspace=0.3)
 
     # Use the same engine as detailed RUL plot
     orig_sensors = longest_engine['original']  # [seq_len, features]
@@ -329,38 +220,95 @@ def comprehensive_model_evaluation_and_visualization(model_class, test_loader, s
     plt.savefig('enhanced_rul_prediction_results.png', dpi=300, bbox_inches='tight')
     plt.savefig('enhanced_rul_prediction_results.pdf', bbox_inches='tight')
 
-    print("Comprehensive evaluation plots saved successfully!")
+    print("Nature-style plots saved successfully!")
     print("Files: enhanced_rul_prediction_results.png, enhanced_rul_prediction_results.pdf")
 
     plt.show()
 
-    # Print comprehensive evaluation summary
+    # Calculate comprehensive evaluation metrics
     print(f"\n{'='*80}")
-    print("COMPREHENSIVE MODEL EVALUATION SUMMARY")
+    print("COMPREHENSIVE MODEL EVALUATION METRICS")
     print(f"{'='*80}")
-    print(f"Overall Test RMSE:      {overall_metrics['rmse']:.6f}")
-    print(f"Overall Test Score:      {overall_metrics['score']:.6f}")
-    print(f"Overall Test Accuracy:   {overall_metrics['accuracy']:.2f}%")
-    print(f"Total Test Samples:      {overall_metrics['n_samples']:,}")
-    print(f"Number of Engines:       {len(engine_data)}")
-    print(f"\nMETRIC EXPLANATIONS:")
-    print(f"- RMSE: Root Mean Square Error (lower is better)")
-    print(f"- Score: Time-Deviation Penalty Index with asymmetric penalties (lower is better)")
-    print(f"- Accuracy: Percentage of predictions within tolerance [-13, +10] cycles (higher is better)")
+
+    # Collect all valid predictions and targets
+    all_valid_predictions = []
+    all_valid_targets = []
+
+    for engine in engine_data:
+        mask = engine['mask'].astype(bool)
+        if np.any(mask):
+            all_valid_predictions.extend(engine['prediction'][mask])
+            all_valid_targets.extend(engine['target'][mask])
+
+    all_valid_predictions = np.array(all_valid_predictions)
+    all_valid_targets = np.array(all_valid_targets)
+
+    # Calculate deviation (d_m = predicted - actual)
+    deviations = all_valid_predictions - all_valid_targets
+
+    # (1) Root Mean Square Error (RMSE)
+    mse = np.mean(deviations ** 2)
+    rmse = np.sqrt(mse)
+
+    # (2) Score (Time-Deviation Penalty Index)
+    score_values = np.where(
+        deviations < 0,
+        np.exp(-deviations / 13) - 1,  # Early predictions (less penalty)
+        np.exp(deviations / 10) - 1    # Late predictions (more penalty)
+    )
+    score = np.sum(score_values)
+
+    # (3) Accuracy (Tolerance-Based)
+    tolerance_mask = (deviations >= -13) & (deviations <= 10)
+    accuracy = np.mean(tolerance_mask) * 100
+
+    # Additional metrics
+    mae = np.mean(np.abs(deviations))
+
+    # Print results
+    print(f"Root Mean Square Error (RMSE): {rmse:.6f}")
+    print(f"Score (Time-Deviation Penalty): {score:.6f}")
+    print(f"Accuracy (Tolerance [-13, +10]): {accuracy:.2f}%")
+    print(f"Mean Absolute Error (MAE): {mae:.6f}")
+    print(f"Mean Square Error (MSE): {mse:.6f}")
+    print(f"Total Test Samples: {len(all_valid_predictions):,}")
+    print(f"Number of Engines: {len(engine_data)}")
+    
+    # Additional statistics
+    print(f"\nPrediction Statistics:")
+    print(f"Mean Deviation: {np.mean(deviations):.6f}")
+    print(f"Std Deviation: {np.std(deviations):.6f}")
+    print(f"Min Deviation: {np.min(deviations):.6f}")
+    print(f"Max Deviation: {np.max(deviations):.6f}")
+    print(f"Percentage of Late Predictions: {np.mean(deviations > 0) * 100:.2f}%")
+    print(f"Percentage of Early Predictions: {np.mean(deviations < 0) * 100:.2f}%")
     print(f"{'='*80}")
 
     return {
-        'rmse': overall_metrics['rmse'],
-        'score': overall_metrics['score'],
-        'accuracy': overall_metrics['accuracy'],
-        'n_samples': overall_metrics['n_samples'],
+        'rmse': rmse,
+        'score': score,
+        'accuracy': accuracy,
+        'mae': mae,
+        'mse': mse,
+        'mean_deviation': np.mean(deviations),
+        'std_deviation': np.std(deviations),
+        'n_samples': len(all_valid_predictions),
         'n_engines': len(engine_data),
-        'engine_data': engine_data,
-        'detailed_engine_metrics': {
-            'rmse': detailed_metrics['rmse'],
-            'score': detailed_metrics['score'],
-            'accuracy': detailed_metrics['accuracy'],
-            'engine_id': longest_engine['engine_id']
-        },
-        'all_metrics': overall_metrics
+        'late_predictions_pct': np.mean(deviations > 0) * 100,
+        'early_predictions_pct': np.mean(deviations < 0) * 100
     }
+
+
+# Call the comprehensive evaluation function
+evaluation_results = comprehensive_model_evaluation(
+    model_save_path='best_enhanced_model.pth',
+    test_loader=test_loader,
+    sensor_channels=[1, 2, 3, 4, 11, 12, 13, 15, 17, 20],
+    n_engines=6,
+    figsize=(16, 20)
+)
+
+print(f"\nFINAL EVALUATION SUMMARY:")
+print(f"Score: {evaluation_results['score']:.6f}")
+print(f"Accuracy: {evaluation_results['accuracy']:.2f}%")
+print(f"MAE: {evaluation_results['mae']:.6f}")
