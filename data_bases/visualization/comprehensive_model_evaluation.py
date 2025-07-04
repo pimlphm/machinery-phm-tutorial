@@ -278,19 +278,7 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
     print(f"Root Mean Square Error (RMSE): {rmse:.6f}")
     print(f"Score (Time-Deviation Penalty): {score:.6f}")
     print(f"Accuracy (Tolerance [-13, +10]): {accuracy:.2f}%")
-    print(f"Mean Absolute Error (MAE): {mae:.6f}")
-    print(f"Mean Square Error (MSE): {mse:.6f}")
-    print(f"Total Test Samples: {len(all_valid_predictions):,}")
-    print(f"Number of Engines: {len(engine_data)}")
-    
-    # Additional statistics
-    print(f"\nPrediction Statistics:")
-    print(f"Mean Deviation: {np.mean(deviations):.6f}")
-    print(f"Std Deviation: {np.std(deviations):.6f}")
-    print(f"Min Deviation: {np.min(deviations):.6f}")
-    print(f"Max Deviation: {np.max(deviations):.6f}")
-    print(f"Percentage of Late Predictions: {np.mean(deviations > 0) * 100:.2f}%")
-    print(f"Percentage of Early Predictions: {np.mean(deviations < 0) * 100:.2f}%")
+
     print(f"{'='*80}")
 
     return {
