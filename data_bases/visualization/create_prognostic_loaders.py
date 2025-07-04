@@ -317,10 +317,10 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
     # print("✅ Enhanced DataLoader batch shapes:")
     print("x:", batch['x'].shape)
     print("rul:", batch['rul'].shape)
-    print("rul_original:", batch['rul_original'].shape)
-    print("mask:", batch['mask'].shape)
-    if 'seg_label' in batch:
-        print("seg_label:", batch['seg_label'].shape)
+    # print("rul_original:", batch['rul_original'].shape)
+    # print("mask:", batch['mask'].shape)
+    # if 'seg_label' in batch:
+    #     print("seg_label:", batch['seg_label'].shape)
     
     # print(f"\n🎯 Configuration Summary:")
     print(f"Selected sensors: {selected_sensors}")
