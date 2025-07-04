@@ -366,10 +366,8 @@ def process_cmapss_data(base_path="/content/turbofan_data",
             return len(self.X)
         
         def __getitem__(self, idx):
-            return {
-                'x': self.X[idx],                     
-                'rul': self.y[idx]
-            }
+            # Return tuple instead of dictionary to avoid warnings
+            return self.X[idx], self.y[idx]
     
     # Create datasets
     train_dataset = RULDataset(X_train, y_train)
@@ -381,12 +379,12 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
     # Show a sample batch
-    sample_batch = next(iter(train_loader))
-    print(f"Training batch - X shape: {sample_batch['x'].shape}, y shape: {sample_batch['rul'].shape}")
-    print(f"Feature vector size: {sample_batch['x'].shape[1]} (sensors: {len(selected_sensors)}, features per sensor: 9)")
+    sample_x, sample_y = next(iter(train_loader))
+    print(f"Training batch - X shape: {sample_x.shape}, y shape: {sample_y.shape}")
+    print(f"Feature vector size: {sample_x.shape[1]} (sensors: {len(selected_sensors)}, features per sensor: 9)")
     
-    sample_test_batch = next(iter(test_loader))
-    print(f"Test batch - X shape: {sample_test_batch['x'].shape}, y shape: {sample_test_batch['rul'].shape}")
+    sample_test_x, sample_test_y = next(iter(test_loader))
+    print(f"Test batch - X shape: {sample_test_x.shape}, y shape: {sample_test_y.shape}")
     
     return {
         'train_loader': train_loader,
