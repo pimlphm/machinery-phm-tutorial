@@ -22,9 +22,16 @@ def comprehensive_model_evaluation(model,model_save_path, test_loader,
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # Load best model
+    # Load best model - fix the loading issue
     checkpoint = torch.load(model_save_path, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    # Handle different checkpoint formats
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        # If the checkpoint is just the state_dict directly (as saved by torch.save(model.state_dict(), path))
+        model.load_state_dict(checkpoint)
+    
     model.to(device)
     model.eval()
 
@@ -299,16 +306,4 @@ def comprehensive_model_evaluation(model,model_save_path, test_loader,
     }
 
 
-# Call the comprehensive evaluation function
-evaluation_results = comprehensive_model_evaluation(
-    model_save_path='best_enhanced_model.pth',
-    test_loader=test_loader,
-    sensor_channels=[1, 2, 3, 4, 11, 12, 13, 15, 17, 20],
-    n_engines=6,
-    figsize=(16, 20)
-)
 
-print(f"\nFINAL EVALUATION SUMMARY:")
-print(f"Score: {evaluation_results['score']:.6f}")
-print(f"Accuracy: {evaluation_results['accuracy']:.2f}%")
-print(f"MAE: {evaluation_results['mae']:.6f}")
