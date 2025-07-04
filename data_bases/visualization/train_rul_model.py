@@ -19,6 +19,7 @@ def train_rul_model_with_optional_reconstruction(
     model,
     train_loader,
     val_loader,
+    compute_reconstruction_loss,  # Function to compute reconstruction loss
     num_epochs=50,
     patience=10,
     lr=1e-3,
