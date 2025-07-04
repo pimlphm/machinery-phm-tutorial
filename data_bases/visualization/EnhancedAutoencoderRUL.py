@@ -7,6 +7,20 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.patches import Rectangle
 import matplotlib.patches as mpatches
+# === Core Python ===
+import os
+import numpy as np
+
+
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+
+# === Optimizer & Scheduler ===
+from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
+# === Utility ===
+from tqdm import tqdm  # Progress bar for training loops
 
 # === Enhanced Model ===
 class EnhancedAutoencoderRUL(nn.Module):
