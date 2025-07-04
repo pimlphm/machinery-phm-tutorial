@@ -1,4 +1,4 @@
-def comprehensive_model_evaluation_and_visualization(model, test_loader, save_path='best_enhanced_model.pth',
+def comprehensive_model_evaluation_and_visualization( test_loader, save_path='best_enhanced_model.pth',
                                                    sensor_channels=list(range(1, 22)),
                                                    n_engines=6, figsize=(16, 20)):
     """
