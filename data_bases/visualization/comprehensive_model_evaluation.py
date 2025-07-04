@@ -306,3 +306,4 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
         'late_predictions_pct': np.mean(deviations > 0) * 100,
         'early_predictions_pct': np.mean(deviations < 0) * 100
     }
+
