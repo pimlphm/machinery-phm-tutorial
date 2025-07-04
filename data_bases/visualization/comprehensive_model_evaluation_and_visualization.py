@@ -29,7 +29,16 @@ def comprehensive_model_evaluation_and_visualization(model_class, test_loader, s
     
     # Create model instance and load state dict
     model = model_class().to(device)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    # Handle different checkpoint formats
+    if 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+    elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['state_dict'])
+    else:
+        # Assume the checkpoint is the state dict itself
+        model.load_state_dict(checkpoint)
+    
     model.eval()
 
     # Set style for publication-quality plots
@@ -355,7 +364,3 @@ def comprehensive_model_evaluation_and_visualization(model_class, test_loader, s
         },
         'all_metrics': overall_metrics
     }
-
-
-
-
