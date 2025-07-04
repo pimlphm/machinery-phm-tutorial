@@ -277,10 +277,11 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         """
         对滑窗内的每个通道在整个窗口T内做统计分析
         输入: window_data - shape [T, F] (时间步，特征数)
-        输出: features - shape [F × 特征数] (每个传感器的统计特征向量)
+        输出: features - shape [F, 统计特征数] (每个传感器的统计特征向量)
         """
         T, F = window_data.shape
-        features = []
+        num_stats = 9  # 统计特征数量
+        features = np.zeros((F, num_stats))
         
         for f in range(F):
             channel_data = window_data[:, f]
@@ -302,16 +303,14 @@ def process_cmapss_data(base_path="/content/turbofan_data",
             else:
                 slope = 0
             
-            # 组合所有特征
-            channel_features = [mean_val, std_val, min_val, max_val, range_val, 
-                              median_val, q25, q75, slope]
-            
-            features.extend(channel_features)
+            # 存储为 [通道, 统计特征] 格式
+            features[f, :] = [mean_val, std_val, min_val, max_val, range_val, 
+                             median_val, q25, q75, slope]
         
-        return np.array(features)
+        return features
     
     def create_windows_with_statistical_features(data, window_size, stride, sensor_indices):
-        """创建滑动窗口并提取统计特征"""
+        """创建滑动窗口并提取统计特征，返回 [batch, 通道, 统计特征] 格式"""
         X, y, window_indices = [], [], []
         sensors = [f'sensor_{i}' for i in sensor_indices]
         
@@ -329,7 +328,7 @@ def process_cmapss_data(base_path="/content/turbofan_data",
                 window_data = np.nan_to_num(window_data, nan=0.0, posinf=1e6, neginf=-1e6)
                 window_rul = np.nan_to_num(window_rul, nan=0.0, posinf=1e6, neginf=-1e6)
                 
-                # 提取统计特征 - 从 [T, F] 到 [F × 特征数]
+                # 提取统计特征 - 从 [T, F] 到 [F, 统计特征数]
                 statistical_features = extract_statistical_features(window_data)
                 
                 X.append(statistical_features)
@@ -381,7 +380,8 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     # Show a sample batch
     sample_x, sample_y = next(iter(train_loader))
     print(f"Training batch - X shape: {sample_x.shape}, y shape: {sample_y.shape}")
-    print(f"Feature vector size: {sample_x.shape[1]} (sensors: {len(selected_sensors)}, features per sensor: 9)")
+    print(f"Feature tensor format: [batch_size, channels, statistical_features] = [{sample_x.shape[0]}, {sample_x.shape[1]}, {sample_x.shape[2]}]")
+    print(f"Channels (sensors): {len(selected_sensors)}, Statistical features per channel: 9")
     
     sample_test_x, sample_test_y = next(iter(test_loader))
     print(f"Test batch - X shape: {sample_test_x.shape}, y shape: {sample_test_y.shape}")
@@ -402,6 +402,7 @@ def process_cmapss_data(base_path="/content/turbofan_data",
             'n_clusters_or_bins': n_clusters_or_bins,
             'variance_threshold': variance_threshold,
             'engine_level_normalization': engine_level_normalization,
-            'statistical_features': True
+            'statistical_features': True,
+            'output_format': '[batch_size, channels, statistical_features]'
         }
     }
