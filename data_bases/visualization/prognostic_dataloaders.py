@@ -1,4 +1,3 @@
-
 # === Basic Python ===
 import os
 
@@ -30,94 +29,19 @@ warnings.filterwarnings('ignore')
 sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
 BATCH_SIZE = 256
 
-# === Dataset Class: Extract (x, rul) by unit ===
-class CmapssDataset(Dataset):
-    def __init__(self, samples, device='cpu'):
-        self.samples = samples
-        self.device = device
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, i):
-        s = self.samples[i]
-        df = s['data']  # DataFrame: (T_i, C)
-
-        x = torch.from_numpy(df[sensor_cols].values.astype('float32')).to(self.device)  # (T_i, C)
-        rul = torch.from_numpy(df['RUL'].values.astype('float32')).to(self.device)      # (T_i,)
-
-        return {
-            'x': x,                  # (T_i, C)
-            'rul': rul,              # (T_i,)
-            'unit': s['unit'],       # int
-            'subset': s['subset'],   # str
-        }
-
-# === Collate Function: Support padding ===
-def collate_fn(batch):
+# === Comprehensive CMAPSS Data Processing Pipeline with All Components ===
+def process_cmapss_data_complete(base_path="/content/turbofan_data", 
+                                fd_datasets=['FD001', 'FD002', 'FD003', 'FD004'],
+                                variance_threshold=1e-6,
+                                selected_sensors=None,
+                                engine_level_normalization=True,
+                                train_ratio=0.7,
+                                val_ratio=0.15,
+                                batch_size=BATCH_SIZE,
+                                seed=42,
+                                device='cuda' if torch.cuda.is_available() else 'cpu'):
     """
-    batch: list of dicts: each with keys: 'x', 'rul', 'unit', 'subset'
-    Returns: padded x/rul/mask + unit/subset info
-    """
-    lengths = [b['x'].size(0) for b in batch]
-    T_max = max(lengths)
-    C = batch[0]['x'].size(1)
-    B = len(batch)
-
-    x_batch = torch.zeros(B, T_max, C, device=batch[0]['x'].device)
-    rul_batch = torch.zeros(B, T_max, device=batch[0]['x'].device)
-    mask = torch.zeros(B, T_max, device=batch[0]['x'].device)
-
-    units = []
-    subsets = []
-
-    for i, b in enumerate(batch):
-        T = b['x'].size(0)
-        x_batch[i, :T] = b['x']
-        rul_batch[i, :T] = b['rul']
-        mask[i, :T] = 1
-        units.append(b['unit'])
-        subsets.append(b['subset'])
-
-    return {
-        'x': x_batch,         # (B, T_max, C)
-        'rul': rul_batch,     # (B, T_max)
-        'mask': mask,         # (B, T_max)
-        'unit': units,        # list of ints
-        'subset': subsets     # list of strings
-    }
-
-# === Data Split Function ===
-def split_cmapss_data(all_data, train_ratio=0.7, val_ratio=0.15, seed=42):
-    np.random.seed(seed)
-    np.random.shuffle(all_data)
-    N = len(all_data)
-    n1 = int(train_ratio * N)
-    n2 = int((train_ratio + val_ratio) * N)
-    return all_data[:n1], all_data[n1:n2], all_data[n2:]
-
-# === Build DataLoader (General Function) ===
-def build_loaders(all_data, batch_size=BATCH_SIZE, device='cuda' if torch.cuda.is_available() else 'cpu'):
-    train_samps, val_samps, test_samps = split_cmapss_data(all_data)
-
-    train_ds = CmapssDataset(train_samps, device)
-    val_ds = CmapssDataset(val_samps, device)
-    test_ds = CmapssDataset(test_samps, device)
-
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
-
-    return train_loader, val_loader, test_loader
-
-# === Comprehensive CMAPSS Data Processing Pipeline ===
-def process_cmapss_data(base_path="/content/turbofan_data", 
-                       fd_datasets=['FD001', 'FD002', 'FD003', 'FD004'],
-                       variance_threshold=1e-6,
-                       selected_sensors=None,
-                       engine_level_normalization=True):
-    """
-    Comprehensive CMAPSS data processing pipeline with improved preprocessing
+    Comprehensive CMAPSS data processing pipeline with all components integrated
     
     Args:
         base_path: Path to CMAPSS data files
@@ -125,7 +49,92 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         variance_threshold: Threshold for removing low-variance sensors
         selected_sensors: Specific sensors to use (if None, auto-select based on variance)
         engine_level_normalization: Whether to normalize at engine level vs global
+        train_ratio: Ratio for training split
+        val_ratio: Ratio for validation split
+        batch_size: Batch size for DataLoaders
+        seed: Random seed for reproducibility
+        device: Device for tensors
     """
+    
+    # === Dataset Class: Extract (x, rul) by unit ===
+    class CmapssDataset(Dataset):
+        def __init__(self, samples, device='cpu'):
+            self.samples = samples
+            self.device = device
+
+        def __len__(self):
+            return len(self.samples)
+
+        def __getitem__(self, i):
+            s = self.samples[i]
+            df = s['data']  # DataFrame: (T_i, C)
+
+            x = torch.from_numpy(df[sensor_cols].values.astype('float32')).to(self.device)  # (T_i, C)
+            rul = torch.from_numpy(df['RUL'].values.astype('float32')).to(self.device)      # (T_i,)
+
+            return {
+                'x': x,                  # (T_i, C)
+                'rul': rul,              # (T_i,)
+                'unit': s['unit'],       # int
+                'subset': s['subset'],   # str
+            }
+
+    # === Collate Function: Support padding ===
+    def collate_fn(batch):
+        """
+        batch: list of dicts: each with keys: 'x', 'rul', 'unit', 'subset'
+        Returns: padded x/rul/mask + unit/subset info
+        """
+        lengths = [b['x'].size(0) for b in batch]
+        T_max = max(lengths)
+        C = batch[0]['x'].size(1)
+        B = len(batch)
+
+        x_batch = torch.zeros(B, T_max, C, device=batch[0]['x'].device)
+        rul_batch = torch.zeros(B, T_max, device=batch[0]['x'].device)
+        mask = torch.zeros(B, T_max, device=batch[0]['x'].device)
+
+        units = []
+        subsets = []
+
+        for i, b in enumerate(batch):
+            T = b['x'].size(0)
+            x_batch[i, :T] = b['x']
+            rul_batch[i, :T] = b['rul']
+            mask[i, :T] = 1
+            units.append(b['unit'])
+            subsets.append(b['subset'])
+
+        return {
+            'x': x_batch,         # (B, T_max, C)
+            'rul': rul_batch,     # (B, T_max)
+            'mask': mask,         # (B, T_max)
+            'unit': units,        # list of ints
+            'subset': subsets     # list of strings
+        }
+
+    # === Data Split Function ===
+    def split_cmapss_data_internal(all_data, train_ratio=train_ratio, val_ratio=val_ratio, seed=seed):
+        np.random.seed(seed)
+        np.random.shuffle(all_data)
+        N = len(all_data)
+        n1 = int(train_ratio * N)
+        n2 = int((train_ratio + val_ratio) * N)
+        return all_data[:n1], all_data[n1:n2], all_data[n2:]
+
+    # === Build DataLoader Function ===
+    def build_loaders_internal(all_data, batch_size=batch_size, device=device):
+        train_samps, val_samps, test_samps = split_cmapss_data_internal(all_data)
+
+        train_ds = CmapssDataset(train_samps, device)
+        val_ds = CmapssDataset(val_samps, device)
+        test_ds = CmapssDataset(test_samps, device)
+
+        train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+        val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+        test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+
+        return train_loader, val_loader, test_loader
     
     # === Integrated CMAPSS data loading function ===
     def load_cmapss_internal(base_path, dataset=None):
@@ -335,7 +344,7 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         })
     
     # === 5. Build DataLoaders ===
-    train_loader, val_loader, test_loader = build_loaders(all_data, batch_size=BATCH_SIZE)
+    train_loader, val_loader, test_loader = build_loaders_internal(all_data, batch_size=batch_size)
     
     print(f"Total samples: {len(all_data)}")
     print(f"Train / Val / Test: {len(train_loader.dataset)} / {len(val_loader.dataset)} / {len(test_loader.dataset)}")
@@ -361,9 +370,10 @@ def process_cmapss_data(base_path="/content/turbofan_data",
             'variance_threshold': variance_threshold,
             'engine_level_normalization': engine_level_normalization,
             'output_format': '[batch_size, T_max, channels] with padding and mask',
-            'batch_size': BATCH_SIZE
+            'batch_size': batch_size
         }
     }
+
 
 # # === Basic Python ===
 # import os
