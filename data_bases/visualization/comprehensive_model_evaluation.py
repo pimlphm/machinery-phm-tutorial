@@ -3,13 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
-def comprehensive_model_evaluation(model,model_save_path, test_loader, 
+
+def comprehensive_model_evaluation(model, model_save_path, test_loader, 
                                  sensor_channels=list(range(1, 22)),
                                  n_engines=6, figsize=(16, 20)):
     """
     Comprehensive evaluation and visualization of the enhanced LSTM autoencoder model.
     
     Args:
+        model: The model instance to evaluate
         model_save_path (str): Path to the saved model checkpoint
         test_loader: DataLoader for test data
         sensor_channels (list): List of sensor channels to visualize
@@ -304,6 +306,3 @@ def comprehensive_model_evaluation(model,model_save_path, test_loader,
         'late_predictions_pct': np.mean(deviations > 0) * 100,
         'early_predictions_pct': np.mean(deviations < 0) * 100
     }
-
-
-
