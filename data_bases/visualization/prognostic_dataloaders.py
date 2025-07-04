@@ -21,6 +21,7 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectKBest, f_regression
 from scipy.stats import pearsonr
+from scipy import stats
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -51,8 +52,6 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         selected_sensors: Specific sensors to use (if None, auto-select based on variance)
         engine_level_normalization: Whether to normalize at engine level vs global
     """
-    
-    print("🔄 Starting comprehensive CMAPSS data processing...")
     
     # === Integrated CMAPSS data loading function ===
     def load_cmapss_internal(base_path, dataset=None):
@@ -147,7 +146,6 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     train_dfs, test_dfs = [], []
     
     for fd_name in fd_datasets:
-        print(f"📂 Loading {fd_name} dataset...")
         train_df, test_df = load_cmapss_internal(base_path, dataset=fd_name)
         
         # Add dataset identifier for tracking
@@ -161,15 +159,11 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     if len(train_dfs) > 1:
         train_df = pd.concat(train_dfs, ignore_index=True)
         test_df = pd.concat(test_dfs, ignore_index=True)
-        print(f"📊 Combined {len(fd_datasets)} datasets: {fd_datasets}")
     else:
         train_df = train_dfs[0]
         test_df = test_dfs[0]
-        print(f"📊 Using single dataset: {fd_datasets[0]}")
     
     # === 2. Operational Setting Regularization ===
-    print(f"⚙️ Applying operational setting regularization using {setting_normalization}...")
-    
     setting_cols = ['setting1', 'setting2', 'setting3']
     
     if setting_normalization == 'kmeans':
@@ -189,8 +183,6 @@ def process_cmapss_data(base_path="/content/turbofan_data",
             train_df[f'setting_cluster_{i}'] = (setting_clusters == i).astype(int)
             test_df[f'setting_cluster_{i}'] = (test_clusters == i).astype(int)
         
-        print(f"   ✅ Created {n_clusters_or_bins} operational setting clusters")
-        
     elif setting_normalization == 'binning':
         # Use binning for each setting dimension
         for setting_col in setting_cols:
@@ -205,12 +197,8 @@ def process_cmapss_data(base_path="/content/turbofan_data",
             for i in range(len(bins)-1):
                 train_df[f'{setting_col}_bin_{i}'] = (train_df[f'{setting_col}_bin'] == i).astype(int)
                 test_df[f'{setting_col}_bin_{i}'] = (test_df[f'{setting_col}_bin'] == i).astype(int)
-        
-        print(f"   ✅ Created binned features for operational settings")
     
     # === 3. Invalid Sensor Removal ===
-    print("🔍 Identifying and removing invalid sensors...")
-    
     sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
     valid_sensors = []
     
@@ -220,10 +208,6 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         
         if sensor_variance > variance_threshold:
             valid_sensors.append(sensor_col)
-        else:
-            print(f"   ❌ Removing {sensor_col} (variance: {sensor_variance:.2e})")
-    
-    print(f"   ✅ Kept {len(valid_sensors)}/{len(sensor_cols)} sensors")
     
     # Update selected sensors if not provided
     if selected_sensors is None:
@@ -234,11 +218,7 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         valid_sensor_numbers = [int(s.split('_')[1]) for s in valid_sensors]
         selected_sensors = [s for s in selected_sensors if s in valid_sensor_numbers]
     
-    print(f"   📋 Final selected sensors: {selected_sensors}")
-    
     # === 4. Engine-level Normalization ===
-    print(f"📏 Applying {'engine-level' if engine_level_normalization else 'global'} sensor normalization...")
-    
     sensor_cols_to_use = [f'sensor_{i}' for i in selected_sensors]
     scalers = {}
     
@@ -277,8 +257,6 @@ def process_cmapss_data(base_path="/content/turbofan_data",
                 
                 test_df.loc[test_df['engine_id'] == engine_id, sensor_col] = scaler.transform(engine_data).flatten()
         
-        print("   ✅ Applied engine-level normalization")
-        
     else:
         # Global normalization
         for sensor_col in sensor_cols_to_use:
@@ -293,14 +271,47 @@ def process_cmapss_data(base_path="/content/turbofan_data",
             test_df[sensor_col] = scaler.transform(test_data).flatten()
             
             scalers[sensor_col] = scaler
+    
+    # === 5. Statistical Feature Extraction from Sliding Windows ===
+    def extract_statistical_features(window_data):
+        """
+        对滑窗内的每个通道在整个窗口T内做统计分析
+        输入: window_data - shape [T, F] (时间步，特征数)
+        输出: features - shape [F × 特征数] (每个传感器的统计特征向量)
+        """
+        T, F = window_data.shape
+        features = []
         
-        print("   ✅ Applied global normalization")
+        for f in range(F):
+            channel_data = window_data[:, f]
+            
+            # 基础统计特征
+            mean_val = np.mean(channel_data)                    # 均值 - 表示整体水平
+            std_val = np.std(channel_data)                      # 标准差 - 波动范围，反映状态稳定性
+            min_val = np.min(channel_data)                      # 最小值 - 捕捉尖峰或故障信号
+            max_val = np.max(channel_data)                      # 最大值 - 捕捉尖峰或故障信号
+            range_val = max_val - min_val                       # 变化幅度
+            median_val = np.median(channel_data)                # 中位数 - 抗异常值
+            q25 = np.percentile(channel_data, 25)               # 25分位数
+            q75 = np.percentile(channel_data, 75)               # 75分位数
+            
+            # 线性趋势 - 表征退化方向
+            time_indices = np.arange(T)
+            if T > 1:
+                slope, _, _, _, _ = stats.linregress(time_indices, channel_data)
+            else:
+                slope = 0
+            
+            # 组合所有特征
+            channel_features = [mean_val, std_val, min_val, max_val, range_val, 
+                              median_val, q25, q75, slope]
+            
+            features.extend(channel_features)
+        
+        return np.array(features)
     
-    # === 5. Sliding Window Creation ===
-    print(f"🪟 Creating sliding windows (size: {window_size}, stride: {stride})...")
-    
-    def create_windows_improved(data, window_size, stride, sensor_indices):
-        """Create sliding windows with improved preprocessing"""
+    def create_windows_with_statistical_features(data, window_size, stride, sensor_indices):
+        """创建滑动窗口并提取统计特征"""
         X, y, window_indices = [], [], []
         sensors = [f'sensor_{i}' for i in sensor_indices]
         
@@ -318,38 +329,34 @@ def process_cmapss_data(base_path="/content/turbofan_data",
                 window_data = np.nan_to_num(window_data, nan=0.0, posinf=1e6, neginf=-1e6)
                 window_rul = np.nan_to_num(window_rul, nan=0.0, posinf=1e6, neginf=-1e6)
                 
-                X.append(window_data)
+                # 提取统计特征 - 从 [T, F] 到 [F × 特征数]
+                statistical_features = extract_statistical_features(window_data)
+                
+                X.append(statistical_features)
                 y.append(window_rul)
                 window_indices.append((eid, i))
         
         return np.array(X), np.array(y), window_indices
     
-    # Create windows for training and test data
-    X_train, y_train, train_indices = create_windows_improved(
+    # Create windows with statistical features for training and test data
+    X_train, y_train, train_indices = create_windows_with_statistical_features(
         train_df, window_size, stride, selected_sensors
     )
     
-    X_test, y_test, test_indices = create_windows_improved(
+    X_test, y_test, test_indices = create_windows_with_statistical_features(
         test_df, window_size, stride, selected_sensors
     )
     
-    print(f"   ✅ Training windows: {X_train.shape}")
-    print(f"   ✅ Test windows: {X_test.shape}")
-    
     # === 6. Final Data Cleaning and Clipping ===
-    print("🧹 Final data cleaning...")
-    
     # Clip RUL values to reasonable ranges
     y_train = np.clip(y_train, 0.0, 1e6)
     y_test = np.clip(y_test, 0.0, 1e6)
     
-    # Clamp window data to prevent CUDA errors
+    # Clamp feature data to prevent CUDA errors
     X_train = np.clip(X_train, -1e6, 1e6)
     X_test = np.clip(X_test, -1e6, 1e6)
     
     # === 7. Create PyTorch Datasets and DataLoaders ===
-    print("🔄 Creating PyTorch datasets and data loaders...")
-    
     class RULDataset(Dataset):
         def __init__(self, X, y):
             self.X = torch.tensor(X, dtype=torch.float32)
@@ -373,19 +380,13 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     val_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)  # Using train for validation
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
-    # === 8. Summary Information ===
-    print("\n📋 Processing Summary:")
-    print(f"   📊 Datasets used: {fd_datasets}")
-    print(f"   🔧 Selected sensors: {selected_sensors}")
-    print(f"   📏 Window size: {window_size}, Stride: {stride}")
-    print(f"   🏷️ Training samples: {len(train_dataset)}")
-    print(f"   🧪 Test samples: {len(test_dataset)}")
-    print(f"   ⚙️ Setting normalization: {setting_normalization}")
-    print(f"   📐 Engine-level normalization: {engine_level_normalization}")
-    
     # Show a sample batch
     sample_batch = next(iter(train_loader))
-    print(f"   📦 Sample batch - X shape: {sample_batch['x'].shape}, y shape: {sample_batch['rul'].shape}")
+    print(f"Training batch - X shape: {sample_batch['x'].shape}, y shape: {sample_batch['rul'].shape}")
+    print(f"Feature vector size: {sample_batch['x'].shape[1]} (sensors: {len(selected_sensors)}, features per sensor: 9)")
+    
+    sample_test_batch = next(iter(test_loader))
+    print(f"Test batch - X shape: {sample_test_batch['x'].shape}, y shape: {sample_test_batch['rul'].shape}")
     
     return {
         'train_loader': train_loader,
@@ -395,12 +396,14 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         'selected_sensors': selected_sensors,
         'train_df': train_df,
         'test_df': test_df,
+        'feature_names': ['mean', 'std', 'min', 'max', 'range', 'median', 'q25', 'q75', 'slope'],
         'processing_config': {
             'window_size': window_size,
             'stride': stride,
             'setting_normalization': setting_normalization,
             'n_clusters_or_bins': n_clusters_or_bins,
             'variance_threshold': variance_threshold,
-            'engine_level_normalization': engine_level_normalization
+            'engine_level_normalization': engine_level_normalization,
+            'statistical_features': True
         }
     }
