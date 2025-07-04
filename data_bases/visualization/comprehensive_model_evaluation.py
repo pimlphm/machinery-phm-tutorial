@@ -220,7 +220,6 @@ def comprehensive_model_evaluation(model_save_path, test_loader,
     plt.savefig('enhanced_rul_prediction_results.png', dpi=300, bbox_inches='tight')
     plt.savefig('enhanced_rul_prediction_results.pdf', bbox_inches='tight')
 
-    print("Nature-style plots saved successfully!")
     print("Files: enhanced_rul_prediction_results.png, enhanced_rul_prediction_results.pdf")
 
     plt.show()
