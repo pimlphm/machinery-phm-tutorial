@@ -180,7 +180,7 @@ def process_cmapss_data_complete(base_path="/content/turbofan_data",
     # === 5. Split Data ===
     np.random.seed(seed)
     all_windows = train_windows + test_windows
-    np.random.shuffle(all_windows)
+
     
     N = len(all_windows)
     n_train = int(train_ratio * N)
@@ -195,7 +195,7 @@ def process_cmapss_data_complete(base_path="/content/turbofan_data",
     val_dataset = SlidingWindowDataset(val_windows, device)
     test_dataset = SlidingWindowDataset(test_windows, device)
     
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
