@@ -100,8 +100,7 @@ class RULDataset(Dataset):
 
 # === (3): Simple data loaders with standardization ===
 def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, window=32, stride=16, 
-                       selected_sensors=None, auto_sensor_selection=True, 
-                       clip_std_range=3.0,
+                       selected_sensors=None,
                        fd_datasets=['FD001', 'FD002', 'FD003', 'FD004']):
     """
     Simple data loader creation with basic preprocessing
@@ -135,11 +134,8 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
         test_df = test_dfs[0]
         print(f"📊 Using single dataset: {fd_datasets[0]}")
     
-    # Automatic sensor selection if requested
-    if auto_sensor_selection and selected_sensors is None:
-        selected_sensors = auto_select_sensors(train_df, method='correlation', top_k=12)
-        print(f"🤖 Auto-selected sensors: {selected_sensors}")
-    elif selected_sensors is None:
+    # Use provided sensor selection or default sensors
+    if selected_sensors is None:
         selected_sensors = [2, 3, 4, 7, 8, 9, 11, 12, 13, 15, 17, 20]
 
     # Create simple windows
@@ -171,11 +167,6 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
         scaler = StandardScaler()
         train_channel_scaled = scaler.fit_transform(train_channel_data)
         test_channel_scaled = scaler.transform(test_channel_data)
-        
-        # Clip standardized values to prevent extreme outliers
-        if clip_std_range > 0:
-            train_channel_scaled = np.clip(train_channel_scaled, -clip_std_range, clip_std_range)
-            test_channel_scaled = np.clip(test_channel_scaled, -clip_std_range, clip_std_range)
         
         # Clean scaled data
         train_channel_scaled = np.nan_to_num(train_channel_scaled, nan=0.0, posinf=1e6, neginf=-1e6)
