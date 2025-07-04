@@ -1,11 +1,11 @@
-def comprehensive_model_evaluation_and_visualization(model， test_loader, save_path='best_enhanced_model.pth',
+def comprehensive_model_evaluation_and_visualization(model_class, test_loader, save_path='best_enhanced_model.pth',
                                                    sensor_channels=list(range(1, 22)),
                                                    n_engines=6, figsize=(16, 20)):
     """
     Comprehensive evaluation and visualization function for the enhanced LSTM autoencoder model.
     
     Args:
-        model: The trained model to evaluate
+        model_class: The model class to instantiate (not the trained instance)
         test_loader: DataLoader for test data
         save_path: Path to the saved model checkpoint
         sensor_channels: List of sensor channel indices to visualize
@@ -24,8 +24,11 @@ def comprehensive_model_evaluation_and_visualization(model， test_loader, save_
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # Load best model
+    # Load best model from checkpoint
     checkpoint = torch.load(save_path, map_location=device)
+    
+    # Create model instance and load state dict
+    model = model_class().to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
@@ -354,17 +357,5 @@ def comprehensive_model_evaluation_and_visualization(model， test_loader, save_
     }
 
 
-# 调用封装后的函数
-plot_results = comprehensive_model_evaluation_and_visualization(
-    model=trained_model,
-    test_loader=test_loader,
-    save_path='best_enhanced_model.pth',
-    sensor_channels=[1, 2, 3, 4, 11, 12, 13, 15, 17, 20],
-    n_engines=6,
-    figsize=(16, 20)
-)
 
-print(f"\nVisualization completed! Overall test performance:")
-print(f"RMSE: {plot_results['rmse']:.6f}")
-print(f"Score: {plot_results['score']:.6f}")
-print(f"Accuracy: {plot_results['accuracy']:.2f}%")
+
