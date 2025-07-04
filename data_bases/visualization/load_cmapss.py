@@ -1,3 +1,17 @@
+# === Basic Python ===
+import os
+
+# === Data Handling ===
+import pandas as pd
+import numpy as np
+
+# === Plotting (可选，如果你做可视化分析) ===
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# === Machine Learning Utilities ===
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 
 # === Load and Prepare CMAPSS Data ===
 def load_cmapss(base_path, dataset=None):
