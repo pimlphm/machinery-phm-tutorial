@@ -1,16 +1,28 @@
 from torchinfo import summary
 
-def print_model_summary(model, input_shape=(1, 32, 12), device='cpu'):
+def print_model_summary(model, input_shape=(32, 21), device='cpu'):
     """
-    Prints a detailed summary of the PyTorch model similar to TensorFlow's model.summary()
-
+    Print a detailed summary of a PyTorch model (like Keras model.summary()).
+    
     Args:
-        model (nn.Module): The PyTorch model instance
-        input_shape (tuple): Shape of input tensor excluding batch size, e.g. (seq_len, num_features)
-        device (str): Device to place the model for summary ('cpu' or 'cuda')
-
-    Example:
-        print_model_summary(my_model, input_shape=(32, 12))
+        model (nn.Module): PyTorch model instance
+        input_shape (tuple): (seq_len, num_features) of the input
+        device (str): 'cpu' or 'cuda'
     """
-    model.to(device)
-    summary(model, input_size=(1, *input_shape), col_names=["input_size", "output_size", "num_params", "trainable"])
+    try:
+        model.to(device)
+        print("=" * 60)
+        print(f" Model Summary: {model.__class__.__name__}")
+        print(f" Input shape (no batch): {input_shape}")
+        print("=" * 60)
+
+        summary(model,
+                input_size=(1, *input_shape),  # batch_size=1
+                col_names=["input_size", "output_size", "num_params", "trainable"],
+                depth=4,
+                device=device)
+
+    except RuntimeError as e:
+        print("❌ Model summary failed.")
+        print("Reason:", e)
+        print("💡 Hint: Check that input_shape[-1] matches model's expected input_size.")
