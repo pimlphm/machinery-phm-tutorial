@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
-def comprehensive_model_evaluation(model_save_path, test_loader, 
+def comprehensive_model_evaluation(model,model_save_path, test_loader, 
                                  sensor_channels=list(range(1, 22)),
                                  n_engines=6, figsize=(16, 20)):
     """
@@ -25,6 +25,7 @@ def comprehensive_model_evaluation(model_save_path, test_loader,
     # Load best model
     checkpoint = torch.load(model_save_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device)
     model.eval()
 
     # Set style for publication-quality plots
