@@ -30,14 +30,16 @@ sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
 BATCH_SIZE = 256
 
 # === Comprehensive CMAPSS Data Processing Pipeline with All Components ===
-def process_cmapss_data_complete(base_path="/content/turbofan_data", 
-                                fd_datasets=['FD001', 'FD002', 'FD003', 'FD004'],
+def process_cmapss_data_complete(base_path="/content/turbofan_data",
+                                batch_size=128,
+                                window_size=32,
+                                stride=16,
+                                selected_sensors=[2, 3, 4, 7, 8, 9, 11, 12, 13, 15, 17, 20],
+                                fd_datasets=['FD001','FD002','FD003','FD004'],
                                 variance_threshold=1e-6,
-                                selected_sensors=None,
                                 engine_level_normalization=True,
                                 train_ratio=0.7,
                                 val_ratio=0.15,
-                                batch_size=BATCH_SIZE,
                                 seed=42,
                                 device='cuda' if torch.cuda.is_available() else 'cpu'):
     """
@@ -45,13 +47,15 @@ def process_cmapss_data_complete(base_path="/content/turbofan_data",
     
     Args:
         base_path: Path to CMAPSS data files
+        batch_size: Batch size for DataLoaders
+        window_size: Window size for sequence processing
+        stride: Stride for sliding window
+        selected_sensors: Specific sensors to use
         fd_datasets: List of FD datasets to process
         variance_threshold: Threshold for removing low-variance sensors
-        selected_sensors: Specific sensors to use (if None, auto-select based on variance)
         engine_level_normalization: Whether to normalize at engine level vs global
         train_ratio: Ratio for training split
         val_ratio: Ratio for validation split
-        batch_size: Batch size for DataLoaders
         seed: Random seed for reproducibility
         device: Device for tensors
     """
@@ -370,9 +374,12 @@ def process_cmapss_data_complete(base_path="/content/turbofan_data",
             'variance_threshold': variance_threshold,
             'engine_level_normalization': engine_level_normalization,
             'output_format': '[batch_size, T_max, channels] with padding and mask',
-            'batch_size': batch_size
+            'batch_size': batch_size,
+            'window_size': window_size,
+            'stride': stride
         }
     }
+
 
 
 # # === Basic Python ===
