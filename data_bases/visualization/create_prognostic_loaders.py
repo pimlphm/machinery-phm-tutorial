@@ -210,14 +210,40 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
                        per_condition_standardization=True, clip_std_range=3.0,
                        rul_transform='none', boundary_oversample=True,
                        exponential_sampling=True, noise_augmentation=True,
-                       add_diff_features=True, add_position_encoding=True):
+                       add_diff_features=True, add_position_encoding=True,
+                       fd_datasets=['FD001', 'FD002', 'FD003', 'FD004']):
     """
     Enhanced data loader creation with comprehensive preprocessing
+    
+    Args:
+        fd_datasets: List of FD datasets to process. Options: ['FD001', 'FD002', 'FD003', 'FD004']
+                    Example: ['FD001'] or ['FD001', 'FD002'] or ['FD001', 'FD002', 'FD003', 'FD004']
     """
     from sklearn.preprocessing import StandardScaler
 
-    # Load raw data
-    train_df, test_df = load_cmapss(base_path)
+    # Load raw data from specified FD datasets
+    train_dfs, test_dfs = [], []
+    
+    for fd_name in fd_datasets:
+        print(f"🔄 Loading {fd_name} dataset...")
+        train_df, test_df = load_cmapss(base_path, dataset=fd_name)
+        
+        # Add dataset identifier for tracking
+        train_df['dataset'] = fd_name
+        test_df['dataset'] = fd_name
+        
+        train_dfs.append(train_df)
+        test_dfs.append(test_df)
+    
+    # Combine all datasets
+    if len(train_dfs) > 1:
+        train_df = pd.concat(train_dfs, ignore_index=True)
+        test_df = pd.concat(test_dfs, ignore_index=True)
+        print(f"📊 Combined {len(fd_datasets)} datasets: {fd_datasets}")
+    else:
+        train_df = train_dfs[0]
+        test_df = test_dfs[0]
+        print(f"📊 Using single dataset: {fd_datasets[0]}")
     
     # Automatic sensor selection if requested
     if auto_sensor_selection and selected_sensors is None:
@@ -252,7 +278,8 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
         'X_train_shape': X_train.shape,
         'X_test_shape': X_test.shape,
         'y_train_range': (y_train.min(), y_train.max()),
-        'y_test_range': (y_test.min(), y_test.max())
+        'y_test_range': (y_test.min(), y_test.max()),
+        'fd_datasets': fd_datasets
     }
 
     # === Enhanced standardization ===
@@ -323,6 +350,7 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
     #     print("seg_label:", batch['seg_label'].shape)
     
     # print(f"\n🎯 Configuration Summary:")
+
     print(f"Selected sensors: {selected_sensors}")
     print(f"Number of sensor channels: {len(selected_sensors)}")
     # print(f"Enhanced features: diff={add_diff_features}, pos_enc={add_position_encoding}")
@@ -350,6 +378,7 @@ def create_data_loaders(base_path="/content/turbofan_data", batch_size=64, windo
         'selected_sensors': selected_sensors,
         'window_indices': {'train': train_indices, 'test': test_indices},
         'max_rul': max_rul,
+
         'preprocessing_stats': {
             'original_stats': orig_stats,
             'final_shapes': {'train': X_train.shape, 'test': X_test.shape},
