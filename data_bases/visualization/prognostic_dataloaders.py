@@ -38,10 +38,10 @@ def process_cmapss_data(base_path="/content/turbofan_data",
                        stride=16,
                        batch_size=64,
                        variance_threshold=1e-6,
-                       selected_sensors=None,
+                       selected_sensors=[2, 3, 4, 7, 9, 11, 13, 15, 17, 20],
                        monotonicity_threshold=0.5):
     """
-    Comprehensive CMAPSS data processing pipeline with wavelet denoising and monotonicity-based feature selection
+    Comprehensive CMAPSS data processing pipeline with wavelet denoising and pre-selected sensors
     
     Args:
         base_path: Path to CMAPSS data files
@@ -50,8 +50,8 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         stride: Stride for sliding windows
         batch_size: Batch size for data loaders
         variance_threshold: Threshold for removing low-variance sensors
-        selected_sensors: Specific sensors to use (if None, auto-select based on monotonicity)
-        monotonicity_threshold: Minimum monotonicity score for sensor selection
+        selected_sensors: Pre-selected sensor indices to use
+        monotonicity_threshold: Minimum monotonicity score for sensor selection (not used)
     """
     
     # === Integrated CMAPSS data loading function ===
@@ -164,21 +164,13 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         train_df = train_dfs[0]
         test_df = test_dfs[0]
     
-    # === 2. Remove invalid sensors based on variance ===
-    sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
-    valid_sensors = []
+    # === 2. Use pre-selected sensors ===
+    sensor_cols = [f'sensor_{i}' for i in selected_sensors]
     
-    for sensor_col in sensor_cols:
-        # Calculate variance across all engines and cycles
-        sensor_variance = train_df[sensor_col].var()
-        
-        if sensor_variance > variance_threshold:
-            valid_sensors.append(sensor_col)
-    
-    # === 3. Z-score standardization for all valid sensors ===
+    # === 3. Z-score standardization for selected sensors ===
     scalers = {}
     
-    for sensor_col in valid_sensors:
+    for sensor_col in sensor_cols:
         scaler = StandardScaler()
         
         # Fit on training data
@@ -223,22 +215,42 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         return denoised_signal
     
     # === 5. Apply wavelet denoising to each engine's sensor data ===
-    for sensor_col in valid_sensors:
+    for sensor_col in sensor_cols:
         for engine_id in train_df['engine_id'].unique():
-            engine_data = train_df[train_df['engine_id'] == engine_id].sort_values('cycle')
+            engine_mask = train_df['engine_id'] == engine_id
+            engine_data = train_df[engine_mask].sort_values('cycle')
             signal = engine_data[sensor_col].values
             
             if len(signal) > 8:  # Minimum length for wavelet decomposition
-                denoised_signal = wavelet_denoise(signal)
-                train_df.loc[train_df['engine_id'] == engine_id, sensor_col] = denoised_signal
+                try:
+                    denoised_signal = wavelet_denoise(signal)
+                    # Ensure the denoised signal has the same length as the original
+                    if len(denoised_signal) == len(signal):
+                        # Use the sorted indices to assign values
+                        sorted_indices = engine_data.index
+                        for idx, val in zip(sorted_indices, denoised_signal):
+                            train_df.loc[idx, sensor_col] = val
+                except Exception as e:
+                    print(f"Warning: Wavelet denoising failed for engine {engine_id}, sensor {sensor_col}: {e}")
+                    continue
         
         for engine_id in test_df['engine_id'].unique():
-            engine_data = test_df[test_df['engine_id'] == engine_id].sort_values('cycle')
+            engine_mask = test_df['engine_id'] == engine_id
+            engine_data = test_df[engine_mask].sort_values('cycle')
             signal = engine_data[sensor_col].values
             
             if len(signal) > 8:  # Minimum length for wavelet decomposition
-                denoised_signal = wavelet_denoise(signal)
-                test_df.loc[test_df['engine_id'] == engine_id, sensor_col] = denoised_signal
+                try:
+                    denoised_signal = wavelet_denoise(signal)
+                    # Ensure the denoised signal has the same length as the original
+                    if len(denoised_signal) == len(signal):
+                        # Use the sorted indices to assign values
+                        sorted_indices = engine_data.index
+                        for idx, val in zip(sorted_indices, denoised_signal):
+                            test_df.loc[idx, sensor_col] = val
+                except Exception as e:
+                    print(f"Warning: Wavelet denoising failed for engine {engine_id}, sensor {sensor_col}: {e}")
+                    continue
     
     # === 6. Calculate cumulative mean features ===
     def calculate_cumulative_mean_features(df, sensor_cols):
@@ -257,18 +269,21 @@ def process_cmapss_data(base_path="/content/turbofan_data",
                 # Calculate cumulative mean: Feat(x_j,m) = (1/(j+1)) * sum(x_k,m' for k=1 to j)
                 cumulative_mean = engine_data[sensor_col].expanding().mean()
                 
-                df_processed.loc[engine_mask, cumulative_col] = cumulative_mean.values
+                # Assign values using index-based assignment to avoid length mismatch
+                engine_indices = engine_data.index
+                for idx, val in zip(engine_indices, cumulative_mean.values):
+                    df_processed.loc[idx, cumulative_col] = val
         
         return df_processed
     
     # Apply cumulative mean feature calculation
-    train_df = calculate_cumulative_mean_features(train_df, valid_sensors)
-    test_df = calculate_cumulative_mean_features(test_df, valid_sensors)
+    train_df = calculate_cumulative_mean_features(train_df, sensor_cols)
+    test_df = calculate_cumulative_mean_features(test_df, sensor_cols)
     
     # Update sensor columns to use cumulative mean features
-    cumavg_sensor_cols = [f'{sensor}_cumavg' for sensor in valid_sensors]
+    cumavg_sensor_cols = [f'{sensor}_cumavg' for sensor in sensor_cols]
     
-    # === 7. Monotonicity-based sensor selection ===
+    # === 7. Calculate monotonicity scores for information only ===
     def calculate_monotonicity(df, sensor_cols):
         """
         Calculate monotonicity score for each sensor based on degradation trend
@@ -306,20 +321,8 @@ def process_cmapss_data(base_path="/content/turbofan_data",
         
         return monotonicity_scores
     
-    # Calculate monotonicity scores for cumulative mean features
+    # Calculate monotonicity scores for cumulative mean features (for information only)
     monotonicity_scores = calculate_monotonicity(train_df, cumavg_sensor_cols)
-    
-    # Select sensors based on monotonicity threshold
-    if selected_sensors is None:
-        selected_cumavg_sensors = [
-            sensor for sensor, score in monotonicity_scores.items() 
-            if score >= monotonicity_threshold
-        ]
-        # Convert back to original sensor indices
-        selected_sensors = [int(s.split('_')[1]) for s in selected_cumavg_sensors]
-    else:
-        # Use provided sensors and convert to cumulative mean format
-        selected_cumavg_sensors = [f'sensor_{i}_cumavg' for i in selected_sensors]
     
     # === 8. Create sliding windows with cumulative mean features ===
     def create_windows_with_cumavg_features(data, window_size, stride, sensor_cols):
@@ -348,11 +351,11 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     
     # Create windows for training and test data
     X_train, y_train, train_indices = create_windows_with_cumavg_features(
-        train_df, window_size, stride, selected_cumavg_sensors
+        train_df, window_size, stride, cumavg_sensor_cols
     )
     
     X_test, y_test, test_indices = create_windows_with_cumavg_features(
-        test_df, window_size, stride, selected_cumavg_sensors
+        test_df, window_size, stride, cumavg_sensor_cols
     )
     
     # === 9. Final data cleaning and clipping ===
@@ -390,7 +393,7 @@ def process_cmapss_data(base_path="/content/turbofan_data",
     sample_x, sample_y = next(iter(train_loader))
     print(f"Training batch - X shape: {sample_x.shape}, y shape: {sample_y.shape}")
     print(f"Feature tensor format: [batch_size, time_steps, channels] = [{sample_x.shape[0]}, {sample_x.shape[1]}, {sample_x.shape[2]}]")
-    print(f"Selected sensors: {len(selected_sensors)}, Window size: {window_size}")
+    print(f"Selected sensors: {selected_sensors}, Window size: {window_size}")
     
     sample_test_x, sample_test_y = next(iter(test_loader))
     print(f"Test batch - X shape: {sample_test_x.shape}, y shape: {sample_test_y.shape}")
