@@ -141,8 +141,8 @@ def plot_features(features, band_width=50, fs=10000):
     axs[1].set_title("Frequency-Domain Energy Ratios")
     axs[1].set_xlabel("Frequency Bands")
     axs[1].set_ylabel("Signal Index")
-    axs[1].set_xticks(np.arange(len(freq_domain_labels)))
-    axs[1].set_xticklabels(freq_domain_labels, rotation=45, ha='right')
+    # axs[1].set_xticks(np.arange(len(freq_domain_labels)))
+    # axs[1].set_xticklabels(freq_domain_labels, rotation=45, ha='right')
     fig.colorbar(im, ax=axs[1], label="Energy Ratio")
 
     plt.tight_layout()
