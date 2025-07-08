@@ -143,7 +143,7 @@ def plot_features(features, band_width=50, fs=10000):
 
     # Add x‑axis ticks every ~100 Hz (or closest multiple based on band_width)
     if band_width > 0:
-        tick_step = max(1, int(round(300 / band_width)))  # at least one band
+        tick_step = max(1, int(round(500 / band_width)))  # at least one band
         xticks = np.arange(0, num_bands, tick_step)
         xtick_labels = (xticks * band_width).astype(int)
         axs[1].set_xticks(xticks)
