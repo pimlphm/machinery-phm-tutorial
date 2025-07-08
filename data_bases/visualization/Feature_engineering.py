@@ -109,40 +109,45 @@ def Feature_engineering(signals, fs, rpm, band_width=50):
 
 def plot_features(features, band_width=50, fs=10000):
     """
-    Plots extracted features from Feature_engineering, split into time-domain and frequency-domain.
+    Plots extracted features from Feature_engineering, split into time‑domain and frequency‑domain.
 
     Parameters:
         features: np.ndarray of shape (N, 5 + num_bands)
                   Output from Feature_engineering()
-        band_width: Frequency band width in Hz (used for x-axis labeling)
+        band_width: Frequency band width in Hz (used for x‑axis labeling)
         fs: Sampling frequency in Hz
     """
     # Number of signals
     N = features.shape[0]
 
-    # Feature split
+    # Split features
     time_domain_labels = ['RMS', 'Crest Factor', 'Kurtosis', '1X Amp', '2X Amp']
-    freq_domain_labels = [f'{i * band_width}-{(i+1) * band_width}Hz'
-                          for i in range((features.shape[1] - 5))]
+    num_bands = features.shape[1] - 5
 
     time_features = features[:, :5]
     freq_features = features[:, 5:]
 
     fig, axs = plt.subplots(1, 2, figsize=(14, 5))
 
-    # --- Time-Domain Features ---
+    # --- Time‑Domain Features ---
     axs[0].boxplot(time_features, labels=time_domain_labels)
-    axs[0].set_title("Time-Domain Features")
+    axs[0].set_title("Time‑Domain Features")
     axs[0].set_ylabel("Value")
     axs[0].grid(True)
 
-    # --- Frequency-Domain Features ---
+    # --- Frequency‑Domain Features ---
     im = axs[1].imshow(freq_features, aspect='auto', cmap='viridis', interpolation='nearest')
-    axs[1].set_title("Frequency-Domain Energy Ratios")
-    axs[1].set_xlabel("Frequency Bands")
+    axs[1].set_title("Frequency‑Domain Energy Ratios")
+    axs[1].set_xlabel("Frequency (Hz)")
     axs[1].set_ylabel("Signal Index")
-    # Remove x-axis tick labels
-    axs[1].set_xticks([])
+
+    # Add x‑axis ticks every ~100 Hz (or closest multiple based on band_width)
+    if band_width > 0:
+        tick_step = max(1, int(round(100 / band_width)))  # at least one band
+        xticks = np.arange(0, num_bands, tick_step)
+        xtick_labels = (xticks * band_width).astype(int)
+        axs[1].set_xticks(xticks)
+        axs[1].set_xticklabels(xtick_labels, rotation=45, ha='right')
 
     fig.colorbar(im, ax=axs[1], label="Energy Ratio")
 
