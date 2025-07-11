@@ -3,7 +3,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 # Callbacks are helper tools that automatically monitor training and take actions like saving the best model or stopping early when performance stops improving.
 
-def train_diagnostics_model(model, X_train_scaled, y_train_cat, X_val_scaled, y_val_cat, model_save_path="best_model_diagnostics.h5"):
+def train_diagnostics_model(model, X_train_scaled, y_train_cat, X_val_scaled, y_val_cat, model_save_path="best_model_diagnostics.keras"):
     """
     Compile and train the multi-output model with callbacks for saving best model and early stopping
     """
@@ -39,7 +39,8 @@ def train_diagnostics_model(model, X_train_scaled, y_train_cat, X_val_scaled, y_
         monitor='val_class_probability_accuracy',  # Monitor validation classification accuracy
         patience=10,                           # Wait 10 rounds before stopping if no improvement
         restore_best_weights=True,             # Go back to best model after stopping
-        verbose=1                              # Print message when early stopping is triggered
+        verbose=1,                             # Print message when early stopping is triggered
+        mode='max'                             # Maximize accuracy (higher is better)
     )
 
     history = model.fit(
