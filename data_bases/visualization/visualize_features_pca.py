@@ -1,12 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from mpl_toolkits.mplot3d import Axes3D
  
 def visualize_features_pca(
     X: np.ndarray,
     y: np.ndarray,
     n_components: int = 2,
+    standardize: bool = True,
     label_names: list[str] | None = None,
     colors: list[str] | None = None,
     title: str = 'PCA Feature Projection'
@@ -22,6 +24,10 @@ def visualize_features_pca(
             Integer class labels (0,1,2,...).
         n_components : int, default=2
             Number of principal components to compute (must be 2 or 3).
+        standardize : bool, default=True
+            Whether to standardize features before applying PCA.
+            If True, features are z-score normalized (mean=0, std=1).
+            If False, PCA is applied to original features.
         label_names : list of str, optional
             Human-readable names for each integer class.
             If None, classes are labeled by their integer value.
@@ -42,9 +48,21 @@ def visualize_features_pca(
         cmap = plt.get_cmap('tab10')
         colors = [cmap(i) for i in range(len(classes))]
 
+    # Prepare data for PCA
+    X_processed = X.copy()
+    if standardize:
+        scaler = StandardScaler()
+        X_processed = scaler.fit_transform(X_processed)
+
     # Compute PCA
     pca = PCA(n_components=n_components)
-    X_pca = pca.fit_transform(X)
+    X_pca = pca.fit_transform(X_processed)
+
+    # Update title to indicate standardization
+    if standardize:
+        title = title + " (Standardized)"
+    else:
+        title = title + " (Original Scale)"
 
     # Plot
     if n_components == 2:
