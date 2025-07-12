@@ -2,16 +2,34 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-def plot_rul_degradation_3d(train_data):
+def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
     """
-    Create a 3D line plot showing RUL degradation curves for all C-MAPSS engine subsets.
+    Create a 3D line plot showing RUL degradation curves for selected engines from all C-MAPSS engine subsets.
     
     Parameters:
     train_data (dict): Dictionary containing training data for each subset (FD001, FD002, FD003, FD004)
+    n_longest (int): Number of longest curves to select from each subset
+    n_shortest (int): Number of shortest curves to select from each subset
     
     Returns:
     plotly.graph_objects.Figure: 3D line plot figure
     """
+    # === Validate parameters ===
+    subset_info = {}
+    for subset_key in ['FD001', 'FD002', 'FD003', 'FD004']:
+        data = train_data[subset_key]
+        unit_ids = np.unique(data[:, 0])
+        total_engines = len(unit_ids)
+        subset_info[subset_key] = total_engines
+        
+        if n_longest > total_engines or n_shortest > total_engines:
+            error_msg = f"Parameter error: n_longest ({n_longest}) or n_shortest ({n_shortest}) exceeds available engines.\n"
+            error_msg += "Available ranges for each subset:\n"
+            for key, count in subset_info.items():
+                error_msg += f"{key}: 1 to {count} engines\n"
+            print(error_msg)
+            return None
+    
     # === Prepare data from all subsets ===
     fig = go.Figure()
     
@@ -21,8 +39,28 @@ def plot_rul_degradation_3d(train_data):
     for subset_key in ['FD001', 'FD002', 'FD003', 'FD004']:
         data = train_data[subset_key]
         unit_ids = np.unique(data[:, 0])
-
+        
+        # Calculate cycle lengths for each engine
+        engine_lengths = []
         for unit_id in unit_ids:
+            unit_data = data[data[:, 0] == unit_id]
+            cycles = len(unit_data)
+            engine_lengths.append((unit_id, cycles))
+        
+        # Sort by cycle length
+        engine_lengths.sort(key=lambda x: x[1])
+        
+        # Select shortest and longest engines
+        selected_engines = []
+        if n_shortest > 0:
+            selected_engines.extend([x[0] for x in engine_lengths[:n_shortest]])
+        if n_longest > 0:
+            selected_engines.extend([x[0] for x in engine_lengths[-n_longest:]])
+        
+        # Remove duplicates while preserving order
+        selected_engines = list(dict.fromkeys(selected_engines))
+
+        for unit_id in selected_engines:
             unit_data = data[data[:, 0] == unit_id]
             cycles = unit_data[:, 1]
             rul = np.flip(np.arange(len(cycles)))  # decreasing RUL
@@ -35,7 +73,7 @@ def plot_rul_degradation_3d(train_data):
                 mode='lines',
                 line=dict(color=colors[subset_key], width=3),
                 name=subset_key,
-                showlegend=bool(unit_id == unit_ids[0]),  # Convert numpy bool to Python bool
+                showlegend=bool(unit_id == selected_engines[0]),  # Convert numpy bool to Python bool
                 legendgroup=subset_key,
                 hovertemplate='<b>%{fullData.name}</b><br>' +
                               'Operation Cycles: %{x}<br>' +
@@ -46,7 +84,7 @@ def plot_rul_degradation_3d(train_data):
 
     # === Beautify ===
     fig.update_layout(
-        title='C-MAPSS Engine RUL Degradation Curves',
+        title=f'C-MAPSS Engine RUL Degradation Curves (Top {n_longest} Longest + Top {n_shortest} Shortest per Subset)',
         width=1000,
         height=800,
         margin=dict(l=0, r=0, t=50, b=0),
@@ -66,7 +104,8 @@ def plot_rul_degradation_3d(train_data):
     # === Print interpretation information ===
     print("🔍 Interpretation of the Plot:")
     print()
-    print("This 3D plot shows RUL degradation curves for engines in the C-MAPSS dataset.")
+    print("This 3D plot shows RUL degradation curves for selected engines in the C-MAPSS dataset.")
+    print(f"Selected: {n_longest} longest and {n_shortest} shortest curves from each subset.")
     print()
     print("Axes represent:")
     print("X: Operation Cycles")
