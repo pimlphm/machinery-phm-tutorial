@@ -86,17 +86,17 @@ def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
             
             # Add each engine as a separate trace to avoid connecting between engines
             fig.add_trace(go.Scatter3d(
-                x=operating_setting,
-                y=cycles,
-                z=rul,
+                x=cycles,
+                y=rul,
+                z=operating_setting,
                 mode='lines',
                 line=dict(color=colors[subset_key], width=3),
                 name=f'{subset_key} Engine {int(unit_id)}',
                 showlegend=False,
                 hovertemplate='<b>%{fullData.name}</b><br>' +
-                              'Operating Setting: %{x:.2f}<br>' +
-                              'Operation Cycles: %{y}<br>' +
-                              'Remaining Useful Life: %{z}<br>' +
+                              'Operation Cycles: %{x}<br>' +
+                              'Remaining Useful Life: %{y}<br>' +
+                              'Operating Setting: %{z:.2f}<br>' +
                               '<extra></extra>'
             ), row=row, col=col)
 
@@ -118,9 +118,9 @@ def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
                 camera=dict(
                     eye=dict(x=1.5, y=-1.5, z=1.2)
                 ),
-                xaxis=dict(title='Operating Setting', backgroundcolor='white', showbackground=False, showgrid=True, zeroline=False),
-                yaxis=dict(title='Operation Cycles', backgroundcolor='white', showbackground=False, showgrid=True, zeroline=False),
-                zaxis=dict(title='Remaining Useful Life', backgroundcolor='white', showbackground=False, showgrid=True, zeroline=False),
+                xaxis=dict(title='Operation Cycles', backgroundcolor='white', showbackground=False, showgrid=True, zeroline=False),
+                yaxis=dict(title='Remaining Useful Life', backgroundcolor='white', showbackground=False, showgrid=True, zeroline=False),
+                zaxis=dict(title='Operating Setting', backgroundcolor='white', showbackground=False, showgrid=True, zeroline=False),
             )
         })
 
@@ -131,9 +131,9 @@ def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
     print(f"Selected: {n_longest} longest and {n_shortest} shortest curves from each subset.")
     print()
     print("Axes represent:")
-    print("X: Operating Setting (average of operational settings)")
-    print("Y: Operation Cycles")
-    print("Z: Remaining Useful Life (RUL)")
+    print("X: Operation Cycles")
+    print("Y: Remaining Useful Life (RUL)")
+    print("Z: Operating Setting (average of operational settings)")
     print()
     print("Each subplot shows a different subset (FD001–FD004) with distinct operating conditions and fault modes.")
     print()
@@ -148,6 +148,7 @@ def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
     print("Multi-domain complexity: Requires models that can adapt across multiple environments and failure types.")
 
     return fig
+
 
 # import numpy as np
 # import pandas as pd
