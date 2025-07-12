@@ -5,7 +5,7 @@ from plotly.subplots import make_subplots
 
 def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
     """
-    Create 4 subplots of 3D line plots showing RUL degradation curves for selected engines from each C-MAPSS engine subset.
+    Create 4 subplots of 3D scatter plots showing RUL degradation curves for selected engines from each C-MAPSS engine subset.
     
     Parameters:
     train_data (dict): Dictionary containing training data for each subset (FD001, FD002, FD003, FD004)
@@ -13,7 +13,7 @@ def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
     n_shortest (int): Number of shortest curves to select from each subset
     
     Returns:
-    plotly.graph_objects.Figure: 3D line plot figure with 4 subplots
+    plotly.graph_objects.Figure: 3D scatter plot figure with 4 subplots
     """
     # === Validate parameters ===
     subset_info = {}
@@ -89,8 +89,8 @@ def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
                 x=cycles,
                 y=rul,
                 z=operating_setting,
-                mode='lines',
-                line=dict(color=colors[subset_key], width=3),
+                mode='markers',
+                marker=dict(color=colors[subset_key], size=4),
                 name=f'{subset_key} Engine {int(unit_id)}',
                 showlegend=False,
                 hovertemplate='<b>%{fullData.name}</b><br>' +
@@ -148,6 +148,7 @@ def plot_rul_degradation_3d(train_data, n_longest=5, n_shortest=5):
     print("Multi-domain complexity: Requires models that can adapt across multiple environments and failure types.")
 
     return fig
+
 
 
 # import numpy as np
