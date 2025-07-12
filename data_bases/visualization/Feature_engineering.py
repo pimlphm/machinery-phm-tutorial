@@ -107,7 +107,7 @@ def Feature_engineering(signals, fs, rpm, band_width=50):
     # Convert the list of feature vectors into a 2D NumPy array (N samples × D features)
     return np.array(feature_list)
 
-def plot_features(features, band_width=50, fs=10000, fault_types=None):
+def plot_features(features, band_width=50, fs=10000, fault_types=None, title="Feature Analysis"):
     """
     Plots extracted features from Feature_engineering, split into time‑domain and frequency‑domain.
 
@@ -117,6 +117,7 @@ def plot_features(features, band_width=50, fs=10000, fault_types=None):
         band_width: Frequency band width in Hz (used for x‑axis labeling)
         fs: Sampling frequency in Hz
         fault_types: list of strings, fault type names for each signal (optional)
+        title: str, title for the overall plot
     """
     # Number of signals
     N = features.shape[0]
@@ -129,16 +130,17 @@ def plot_features(features, band_width=50, fs=10000, fault_types=None):
     freq_features = features[:, 5:]
 
     fig, axs = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle(title, fontsize=16, fontweight='bold')
 
     # --- Time‑Domain Features ---
     axs[0].boxplot(time_features, labels=time_domain_labels)
-    axs[0].set_title("Time‑Domain Features")
+    axs[0].set_title(f"Time‑Domain Features ({title})")
     axs[0].set_ylabel("Value")
     axs[0].grid(True)
 
     # --- Frequency‑Domain Features ---
     im = axs[1].imshow(freq_features, aspect='auto', cmap='viridis', interpolation='nearest')
-    axs[1].set_title("Frequency‑Domain Energy Ratios")
+    axs[1].set_title(f"Frequency‑Domain Energy Ratios ({title})")
     axs[1].set_xlabel("Frequency (Hz)")
     axs[1].set_ylabel("Signal Index")
 
