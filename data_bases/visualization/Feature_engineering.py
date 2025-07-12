@@ -107,7 +107,7 @@ def Feature_engineering(signals, fs, rpm, band_width=50):
     # Convert the list of feature vectors into a 2D NumPy array (N samples × D features)
     return np.array(feature_list)
 
-def plot_features(features, band_width=50, fs=10000):
+def plot_features(features, band_width=50, fs=10000, fault_types=None):
     """
     Plots extracted features from Feature_engineering, split into time‑domain and frequency‑domain.
 
@@ -116,6 +116,7 @@ def plot_features(features, band_width=50, fs=10000):
                   Output from Feature_engineering()
         band_width: Frequency band width in Hz (used for x‑axis labeling)
         fs: Sampling frequency in Hz
+        fault_types: list of strings, fault type names for each signal (optional)
     """
     # Number of signals
     N = features.shape[0]
@@ -141,7 +142,12 @@ def plot_features(features, band_width=50, fs=10000):
     axs[1].set_xlabel("Frequency (Hz)")
     axs[1].set_ylabel("Signal Index")
 
-    # Add x‑axis ticks every ~100 Hz (or closest multiple based on band_width)
+    # Add fault type labels on y-axis if provided
+    if fault_types is not None and len(fault_types) == N:
+        axs[1].set_yticks(range(N))
+        axs[1].set_yticklabels(fault_types)
+
+    # Add x‑axis ticks every ~100 Hz (or closest multiple based on band_width)
     if band_width > 0:
         tick_step = max(1, int(round(500 / band_width)))  # at least one band
         xticks = np.arange(0, num_bands, tick_step)
@@ -153,4 +159,3 @@ def plot_features(features, band_width=50, fs=10000):
 
     plt.tight_layout()
     plt.show()
-
