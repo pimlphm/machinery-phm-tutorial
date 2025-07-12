@@ -117,6 +117,8 @@ def prepare_cmapss_loaders(
     setting_cols = ['setting_1','setting_2','setting_3']
 
     all_samples = []
+    scalers = {}  # Store scalers for each subset to prevent data leakage
+    
     for subset in subsets:
         file_path = os.path.join(data_root, f"train_{subset}.txt")
         if not os.path.exists(file_path):
@@ -137,26 +139,6 @@ def prepare_cmapss_loaders(
         df = df.merge(max_cycle, on='unit_number')
         df['RUL'] = df['max_cycle'] - df['time_in_cycles']
         df.drop('max_cycle', axis=1, inplace=True)
-
-        """
-        Step 4: Normalize sensor data with proper dtype handling
-        Fix pandas FutureWarning by ensuring compatible dtypes
-        """
-        if subset in condition_normalize:
-            # Group by operating conditions using KMeans clustering
-            df['condition_id'] = KMeans(n_clusters=6, random_state=0) \
-                                   .fit_predict(df[setting_cols])
-            df_scaled = df.copy()
-            for cond in df['condition_id'].unique():
-                mask = df['condition_id']==cond
-                # Fix: Explicitly convert to float64 to match pandas dtype expectations
-                scaled_values = StandardScaler().fit_transform(df.loc[mask, sensor_cols])
-                df_scaled.loc[mask, sensor_cols] = scaled_values.astype('float64')
-            df = df_scaled.drop('condition_id', axis=1)
-        else:
-            # Fix: Explicitly convert to float64 for standard normalization
-            scaled_values = StandardScaler().fit_transform(df[sensor_cols])
-            df[sensor_cols] = scaled_values.astype('float64')
 
         """
         Step 5: Extract sequences for each unit and sort by time
@@ -180,6 +162,67 @@ def prepare_cmapss_loaders(
     train_samples = all_samples[:n1]
     val_samples   = all_samples[n1:n2]
     test_samples  = all_samples[n2:]
+
+    """
+    Step 4: Normalize sensor data ONLY on training data to prevent data leakage
+    Fit scalers on training data and apply to all splits
+    """
+    # Collect all training data for fitting scalers
+    train_data_by_subset = {}
+    for sample in train_samples:
+        subset = sample['subset']
+        if subset not in train_data_by_subset:
+            train_data_by_subset[subset] = []
+        train_data_by_subset[subset].append(sample['data'])
+    
+    # Fit scalers on training data only
+    for subset in train_data_by_subset:
+        train_df = pd.concat(train_data_by_subset[subset], ignore_index=True)
+        
+        if subset in condition_normalize:
+            # Group by operating conditions using KMeans clustering
+            kmeans = KMeans(n_clusters=6, random_state=0)
+            condition_ids = kmeans.fit_predict(train_df[setting_cols])
+            scalers[subset] = {'kmeans': kmeans, 'condition_scalers': {}}
+            
+            for cond in np.unique(condition_ids):
+                mask = condition_ids == cond
+                scaler = StandardScaler()
+                scaler.fit(train_df.loc[mask, sensor_cols])
+                scalers[subset]['condition_scalers'][cond] = scaler
+        else:
+            scaler = StandardScaler()
+            scaler.fit(train_df[sensor_cols])
+            scalers[subset] = {'standard_scaler': scaler}
+
+    # Apply normalization to all samples using fitted scalers
+    def normalize_sample(sample):
+        subset = sample['subset']
+        df = sample['data'].copy()
+        
+        if subset in condition_normalize:
+            # Predict conditions using fitted KMeans
+            condition_ids = scalers[subset]['kmeans'].predict(df[setting_cols])
+            df_scaled = df.copy()
+            
+            for cond in np.unique(condition_ids):
+                mask = condition_ids == cond
+                if cond in scalers[subset]['condition_scalers']:
+                    scaler = scalers[subset]['condition_scalers'][cond]
+                    scaled_values = scaler.transform(df.loc[mask, sensor_cols])
+                    df_scaled.loc[mask, sensor_cols] = scaled_values.astype('float64')
+            df = df_scaled
+        else:
+            scaler = scalers[subset]['standard_scaler']
+            scaled_values = scaler.transform(df[sensor_cols])
+            df[sensor_cols] = scaled_values.astype('float64')
+        
+        return {'unit': sample['unit'], 'subset': sample['subset'], 'data': df}
+
+    # Apply normalization to all splits
+    train_samples = [normalize_sample(s) for s in train_samples]
+    val_samples = [normalize_sample(s) for s in val_samples]
+    test_samples = [normalize_sample(s) for s in test_samples]
 
     """
     Step 7: Define PyTorch Dataset class for CMAPSS data
