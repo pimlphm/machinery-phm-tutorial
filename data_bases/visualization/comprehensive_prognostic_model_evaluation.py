@@ -600,29 +600,25 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
     print(f"Late Predictions: {np.mean(deviations > 0) * 100:.2f}%")
     print(f"Early Predictions: {np.mean(deviations < 0) * 100:.2f}%")
 
-    # Print individual engine statistics
-    print(f"\nINDIVIDUAL ENGINE METRICS:")
-    print(f"{'Engine':<8} {'RMSE':<10} {'MAE':<10} {'Accuracy':<12} {'Samples':<10} {'Mean Dev':<12}")
-    print(f"{'-'*70}")
+    # Print individual engine metrics in a beautiful table format
+    print(f"\n{'='*100}")
+    print("INDIVIDUAL ENGINE METRICS")
+    print(f"{'='*100}")
+    
+    # Determine dataset for each engine (assuming FD001 for now, can be modified)
+    # This would need to be passed as a parameter or determined from the data loader
+    dataset_name = "FD001"  # This should be passed as a parameter or determined dynamically
+    
+    # Create beautiful table header
+    print(f"{'Dataset':<8} {'Engine':<8} {'RMSE':<10} {'MAE':<10} {'MSE':<10} {'Accuracy':<12} {'Samples':<10} {'Mean Dev':<12} {'Std Dev':<12}")
+    print(f"{'─'*8} {'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*12} {'─'*10} {'─'*12} {'─'*12}")
     
     for metrics in engine_metrics:
-        print(f"{metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
-              f"{metrics['accuracy']:<12.2f} {metrics['n_samples']:<10} {metrics['mean_deviation']:<12.4f}")
+        print(f"{dataset_name:<8} {metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
+              f"{metrics['mse']:<10.4f} {metrics['accuracy']:<12.2f}% {metrics['n_samples']:<10} "
+              f"{metrics['mean_deviation']:<12.4f} {metrics['std_deviation']:<12.4f}")
 
-    # Calculate summary statistics across engines
-    engine_rmses = [m['rmse'] for m in engine_metrics]
-    engine_maes = [m['mae'] for m in engine_metrics]
-    engine_accuracies = [m['accuracy'] for m in engine_metrics]
-
-    print(f"\nENGINE-WISE STATISTICS:")
-    print(f"RMSE - Mean: {np.mean(engine_rmses):.4f}, Std: {np.std(engine_rmses):.4f}, "
-          f"Min: {np.min(engine_rmses):.4f}, Max: {np.max(engine_rmses):.4f}")
-    print(f"MAE  - Mean: {np.mean(engine_maes):.4f}, Std: {np.std(engine_maes):.4f}, "
-          f"Min: {np.min(engine_maes):.4f}, Max: {np.max(engine_maes):.4f}")
-    print(f"ACC  - Mean: {np.mean(engine_accuracies):.2f}%, Std: {np.std(engine_accuracies):.2f}%, "
-          f"Min: {np.min(engine_accuracies):.2f}%, Max: {np.max(engine_accuracies):.2f}%")
-
-    print(f"{'='*80}")
+    print(f"{'='*100}")
 
     return {
         'rmse': rmse,
@@ -637,21 +633,21 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
         'early_predictions_pct': np.mean(deviations < 0) * 100,
         'engine_metrics': engine_metrics,
         'engine_rmse_stats': {
-            'mean': np.mean(engine_rmses),
-            'std': np.std(engine_rmses),
-            'min': np.min(engine_rmses),
-            'max': np.max(engine_rmses)
+            'mean': np.mean([m['rmse'] for m in engine_metrics]),
+            'std': np.std([m['rmse'] for m in engine_metrics]),
+            'min': np.min([m['rmse'] for m in engine_metrics]),
+            'max': np.max([m['rmse'] for m in engine_metrics])
         },
         'engine_mae_stats': {
-            'mean': np.mean(engine_maes),
-            'std': np.std(engine_maes),
-            'min': np.min(engine_maes),
-            'max': np.max(engine_maes)
+            'mean': np.mean([m['mae'] for m in engine_metrics]),
+            'std': np.std([m['mae'] for m in engine_metrics]),
+            'min': np.min([m['mae'] for m in engine_metrics]),
+            'max': np.max([m['mae'] for m in engine_metrics])
         },
         'engine_accuracy_stats': {
-            'mean': np.mean(engine_accuracies),
-            'std': np.std(engine_accuracies),
-            'min': np.min(engine_accuracies),
-            'max': np.max(engine_accuracies)
+            'mean': np.mean([m['accuracy'] for m in engine_metrics]),
+            'std': np.std([m['accuracy'] for m in engine_metrics]),
+            'min': np.min([m['accuracy'] for m in engine_metrics]),
+            'max': np.max([m['accuracy'] for m in engine_metrics])
         }
     }
