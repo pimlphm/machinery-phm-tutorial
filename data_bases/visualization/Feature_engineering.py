@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 
-def Feature_engineering(signals, fs, rpm, band_width=50):
+def Feature_extraction(signals, fs, rpm, band_width=50):
     """
     Extracts signal features from both time and frequency domains,
     including energy ratios over fixed-width frequency bands.
