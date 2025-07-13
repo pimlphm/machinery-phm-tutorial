@@ -611,7 +611,7 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
     print(f"{'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*12} {'─'*10} {'─'*12} {'─'*12}")
     
     for metrics in engine_metrics:
-        print(f"{dataset_name:<8} {metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
+        print(f" {metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
               f"{metrics['mse']:<10.4f} {metrics['accuracy']:<12.2f}% {metrics['n_samples']:<10} "
               f"{metrics['mean_deviation']:<12.4f} {metrics['std_deviation']:<12.4f}")
 
