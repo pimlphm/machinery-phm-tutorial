@@ -605,13 +605,10 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
     print("INDIVIDUAL ENGINE METRICS")
     print(f"{'='*100}")
     
-    # Determine dataset for each engine (assuming FD001 for now, can be modified)
-    # This would need to be passed as a parameter or determined from the data loader
-    dataset_name = "FD001"  # This should be passed as a parameter or determined dynamically
     
     # Create beautiful table header
-    print(f"{'Dataset':<8} {'Engine':<8} {'RMSE':<10} {'MAE':<10} {'MSE':<10} {'Accuracy':<12} {'Samples':<10} {'Mean Dev':<12} {'Std Dev':<12}")
-    print(f"{'─'*8} {'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*12} {'─'*10} {'─'*12} {'─'*12}")
+    print(f" {'Engine':<8} {'RMSE':<10} {'MAE':<10} {'MSE':<10} {'Accuracy':<12} {'Samples':<10} {'Mean Dev':<12} {'Std Dev':<12}")
+    print(f"{'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*12} {'─'*10} {'─'*12} {'─'*12}")
     
     for metrics in engine_metrics:
         print(f"{dataset_name:<8} {metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
