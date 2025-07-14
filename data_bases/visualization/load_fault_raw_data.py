@@ -28,14 +28,14 @@ def load_fault_data(file_path='processed_fault_data.npz', num_samples=300, verbo
         fs = data['fs'].item()
         rpm = data['rpm'].item()
 
-    # Now everything else in .npz is released from memory
-    if verbose:
-        print("✅ Shapes after loading subset:")
-        print(f"- Normal:       {normal_data.shape}")
-        print(f"- Misalignment: {misalign_data.shape}")
-        print(f"- Unbalance:    {unbalance_data.shape}")
-        print(f"- Looseness:    {looseness_data.shape}")
-        print(f"- fs: {fs} Hz, rpm: {rpm} rpm")
+    # # Now everything else in .npz is released from memory
+    # if verbose:
+    #     print("✅ Shapes after loading subset:")
+    #     print(f"- Normal:       {normal_data.shape}")
+    #     print(f"- Misalignment: {misalign_data.shape}")
+    #     print(f"- Unbalance:    {unbalance_data.shape}")
+    #     print(f"- Looseness:    {looseness_data.shape}")
+    #     print(f"- fs: {fs} Hz, rpm: {rpm} rpm")
 
     return normal_data,misalign_data, unbalance_data,  looseness_data, fs,rpm
 
