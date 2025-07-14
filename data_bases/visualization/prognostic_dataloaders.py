@@ -92,11 +92,11 @@ def plot_condition_normalization_comparison(
     plt.tight_layout()
     plt.show()
     
-    # Print statistics
-    print(f"\nStatistics for {subset}:")
-    print(f"Number of conditions identified: {n_clusters}")
-    print(f"Condition distribution:")
-    print(df['condition_id'].value_counts().sort_index())
+    # # Print statistics
+    # print(f"\nStatistics for {subset}:")
+    # print(f"Number of conditions identified: {n_clusters}")
+    # print(f"Condition distribution:")
+    # print(df['condition_id'].value_counts().sort_index())
 
 # === Data Loader ===
 def prepare_cmapss_loaders(
