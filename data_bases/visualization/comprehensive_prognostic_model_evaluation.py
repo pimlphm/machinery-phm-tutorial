@@ -606,7 +606,7 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
     
     for metrics in engine_metrics:
         print(f" {metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
-              f"{metrics['mse']:<10.4f} {metrics['accuracy']:<3.2f}% {metrics['n_samples']:<10}")
+              f"{metrics['mse']:<10.4f} {metrics['accuracy']:<3.2f})
 
     print(f"{'='*80}")
 
