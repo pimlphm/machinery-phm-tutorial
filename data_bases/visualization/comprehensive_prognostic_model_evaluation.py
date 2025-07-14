@@ -295,6 +295,7 @@
 #         'early_predictions_pct': np.mean(deviations < 0) * 100
 #     }
 
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -564,9 +565,7 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
                 'mae': engine_mae,
                 'mse': engine_mse,
                 'accuracy': engine_accuracy,
-                'n_samples': len(engine_pred),
-                'mean_deviation': np.mean(engine_deviations),
-                'std_deviation': np.std(engine_deviations)
+                'n_samples': len(engine_pred)
             })
             
             # Add to overall collections
@@ -594,40 +593,30 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
     print(f"Mean Absolute Error (MAE): {mae:.6f}")
     print(f"Mean Square Error (MSE): {mse:.6f}")
     print(f"Accuracy (Tolerance [-13, +10]): {accuracy:.2f}%")
-    print(f"Mean Deviation: {np.mean(deviations):.6f}")
-    print(f"Standard Deviation: {np.std(deviations):.6f}")
-    print(f"Total Samples: {len(all_valid_predictions)}")
-    print(f"Late Predictions: {np.mean(deviations > 0) * 100:.2f}%")
-    print(f"Early Predictions: {np.mean(deviations < 0) * 100:.2f}%")
 
     # Print individual engine metrics in a beautiful table format
-    print(f"\n{'='*100}")
+    print(f"\n{'='*80}")
     print("INDIVIDUAL ENGINE METRICS")
-    print(f"{'='*100}")
+    print(f"{'='*80}")
     
     
     # Create beautiful table header
-    print(f" {'Engine':<8} {'RMSE':<10} {'MAE':<10} {'MSE':<10} {'Accuracy':<12} {'Samples':<10} {'Mean Dev':<12} {'Std Dev':<12}")
-    print(f"{'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*12} {'─'*10} {'─'*12} {'─'*12}")
+    print(f" {'Engine':<8} {'RMSE':<10} {'MAE':<10} {'MSE':<10} {'Accuracy':<12} {'Samples':<10}")
+    print(f"{'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*12} {'─'*10}")
     
     for metrics in engine_metrics:
         print(f" {metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
-              f"{metrics['mse']:<10.4f} {metrics['accuracy']:<12.2f}% {metrics['n_samples']:<10} "
-              f"{metrics['mean_deviation']:<12.4f} {metrics['std_deviation']:<12.4f}")
+              f"{metrics['mse']:<10.4f} {metrics['accuracy']:<12.2f}% {metrics['n_samples']:<10}")
 
-    print(f"{'='*100}")
+    print(f"{'='*80}")
 
     return {
         'rmse': rmse,
         'accuracy': accuracy,
         'mae': mae,
         'mse': mse,
-        'mean_deviation': np.mean(deviations),
-        'std_deviation': np.std(deviations),
         'n_samples': len(all_valid_predictions),
         'n_engines': len(engine_data),
-        'late_predictions_pct': np.mean(deviations > 0) * 100,
-        'early_predictions_pct': np.mean(deviations < 0) * 100,
         'engine_metrics': engine_metrics,
         'engine_rmse_stats': {
             'mean': np.mean([m['rmse'] for m in engine_metrics]),
