@@ -601,12 +601,12 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
     
     
     # Create beautiful table header
-    print(f" {'Engine':<8} {'RMSE':<10} {'MAE':<10} {'MSE':<10} {'Accuracy':<12} {'Samples':<10}")
-    print(f"{'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*12} {'─'*10}")
+    print(f" {'Engine':<8} {'RMSE':<10} {'MAE':<10} {'MSE':<10} {'Samples':<10} {'Accuracy':<12}")
+    print(f"{'─'*8} {'─'*10} {'─'*10} {'─'*10} {'─'*10} {'─'*12}")
     
     for metrics in engine_metrics:
         print(f" {metrics['engine_id']:<8} {metrics['rmse']:<10.4f} {metrics['mae']:<10.4f} "
-              f"{metrics['mse']:<10.4f} {metrics['accuracy']:<3.2f})
+              f"{metrics['mse']:<10.4f} {metrics['n_samples']:<10} {metrics['accuracy']:<3.2f}%")
 
     print(f"{'='*80}")
 
@@ -637,4 +637,3 @@ def comprehensive_model_evaluation(model, model_save_path, test_loader,
             'max': np.max([m['accuracy'] for m in engine_metrics])
         }
     }
-
