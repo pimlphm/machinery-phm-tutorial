@@ -51,7 +51,7 @@ def plot_condition_normalization_comparison(
     for cond in df['condition_id'].unique():
         mask = df['condition_id'] == cond
         scaled_values = StandardScaler().fit_transform(df.loc[mask, sensor_cols])
-        df_normalized.loc[mask, sensor_cols] = scaled_values.astype('float64')
+        df_normalized.loc[mask, sensor_cols] = scaled_values
     
     # Create subplots
     n_sensors = len(sensor_indices)
@@ -210,12 +210,12 @@ def prepare_cmapss_loaders(
                 if cond in scalers[subset]['condition_scalers']:
                     scaler = scalers[subset]['condition_scalers'][cond]
                     scaled_values = scaler.transform(df.loc[mask, sensor_cols])
-                    df_scaled.loc[mask, sensor_cols] = scaled_values.astype('float64')
+                    df_scaled.loc[mask, sensor_cols] = scaled_values
             df = df_scaled
         else:
             scaler = scalers[subset]['standard_scaler']
             scaled_values = scaler.transform(df[sensor_cols])
-            df[sensor_cols] = scaled_values.astype('float64')
+            df[sensor_cols] = scaled_values
         
         return {'unit': sample['unit'], 'subset': sample['subset'], 'data': df}
 
@@ -261,6 +261,7 @@ def prepare_cmapss_loaders(
         return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
 
     return make_loader(train_samples, True), make_loader(val_samples, False), make_loader(test_samples, False)
+
 
 
 # # === Basic Python ===
